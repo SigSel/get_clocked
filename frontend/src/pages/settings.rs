@@ -44,10 +44,15 @@ fn render_header(state: Arc<AppState>) -> Dom {
 
 fn render_content(state: Arc<AppState>) -> Dom {
     html!("div", {
-        .dwclass!("flex flex-col p-6 gap-6")
-        .child(render_folder_section(state.clone()))
-        .child(render_format_section(state.clone()))
-        .child(render_save_button(state.clone()))
+        .dwclass!("flex flex-col items-center justify-center")
+        .style("flex", "1")
+        .child(html!("div", {
+            .dwclass!("flex flex-col gap-6")
+            .style("width", "420px")
+            .child(render_folder_section(state.clone()))
+            .child(render_format_section(state.clone()))
+            .child(render_save_button(state.clone()))
+        }))
     })
 }
 

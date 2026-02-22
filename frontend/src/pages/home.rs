@@ -12,7 +12,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
         .child(
             // Gear icon button — top-left
             html!("button", {
-                .dwclass!("absolute top-4 left-4 cursor-pointer text-gray-400")
+                .dwclass!("absolute top-4 right-4 cursor-pointer text-gray-400")
                 .style("background", "none")
                 .style("border", "none")
                 .style("padding", "4px")
