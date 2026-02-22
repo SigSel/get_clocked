@@ -1,11 +1,11 @@
 # Get Clocked
 
-A desktop app built with Tauri 2 (native shell) and a Rust/WASM frontend. Currently in early development — the UI renders a centered "Get Clocked" heading on a dark background.
+A multi-page dark-themed desktop app built with Tauri 2 (native shell) and a Rust/WASM frontend for registering daily work entries and exporting them.
 
 ## Architecture
 
 **Two-crate Cargo workspace:**
-- `frontend/` (`frontend/src/lib.rs`) — frontend compiled to WASM via Trunk. Uses `dominator` for reactive DOM, `dwind` for Tailwind-style utility classes, and `futures-signals` for reactivity.
+- `frontend/` — frontend compiled to WASM via Trunk. Organized into a `pages/` module with four pages: `Home`, `Settings`, `RegisterWorkday`, and `TemplateMaker`. Uses `dominator` for reactive DOM, `dwind` for Tailwind-style utility classes, and `futures-signals` for reactivity.
 - `src-tauri/` — Tauri 2 native backend. Handles the app window and will expose Tauri commands to the frontend via `tauri-wasm`.
 
 **Build pipeline:** Trunk bundles the WASM frontend into `frontend/dist/`, which Tauri serves as the app's UI.
@@ -42,7 +42,15 @@ frontend/
   Cargo.toml        # Frontend WASM crate
   index.html        # Trunk entry point (links the Rust crate)
   Trunk.toml        # Trunk config (serves :8080, builds to dist/)
-  src/lib.rs        # Frontend entrypoint
+  src/
+    lib.rs          # Frontend entrypoint
+    app.rs          # App state and routing
+    pages/
+      mod.rs
+      home.rs
+      settings.rs
+      register_workday.rs
+      template_maker.rs
   dist/             # Trunk build output (gitignored)
 src-tauri/
   src/main.rs       # Tauri backend entrypoint
@@ -56,6 +64,10 @@ target/             # Rust build artifacts (gitignored)
 - Window: 900×600, title "Get Clocked"
 - Identifier: `com.getclocked.app`
 - Dev URL: `http://localhost:8080` (Trunk)
+
+**Backend commands:** `get_settings`, `save_settings`, `pick_folder`, `export_workday`, `save_template`, `list_templates`
+
+**Settings** (`$APP_CONFIG_DIR/settings.json`): `export_folder`, `export_format`, `template_folder`
 
 ---
 

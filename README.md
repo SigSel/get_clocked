@@ -8,7 +8,9 @@ A desktop time-tracking app built with Tauri 2 and a Rust/WASM frontend.
 - Live total-hours display
 - Copy workday data to clipboard as TSV
 - Export to CSV or XLSX — files named `workday_{date}.csv` / `workday_{date}.xlsx`
-- Persistent settings: export folder and format preference
+- Create reusable category templates via the Template Maker page
+- Template selector in the draft entry form pre-populates categories from a saved template
+- Persistent settings: export folder, export format, and template folder
 
 ## Tech Stack
 
