@@ -1,21 +1,18 @@
-use dominator::{append_dom, body, html};
-use dwind::prelude::*;
-use dwind_macros::dwclass;
+use std::sync::Arc;
+
+use dominator::{append_dom, body};
 use wasm_bindgen::prelude::*;
+
+mod app;
+mod pages;
 
 #[wasm_bindgen(start)]
 fn main() {
     console_error_panic_hook::set_once();
     dwind::stylesheet();
 
-    append_dom(
-        &body(),
-        html!("div", {
-            .dwclass!("w-full h-screen flex items-center justify-center bg-gray-900")
-            .child(html!("h1", {
-                .dwclass!("text-4xl font-bold text-white")
-                .text("Get Clocked")
-            }))
-        }),
-    );
+    wasm_bindgen_futures::spawn_local(async {
+        let state = Arc::new(app::AppState::load().await);
+        append_dom(&body(), app::render(state));
+    });
 }
