@@ -4,11 +4,11 @@ use dominator::{clone, events, html, with_node, Dom};
 use dwind::prelude::*;
 use dwind_macros::dwclass;
 use futures_signals::signal::SignalExt;
-use futures_signals::signal_vec::SignalVecExt;
+use futures_signals::signal_vec::{MutableVec, SignalVecExt};
 use wasm_bindgen_futures::{spawn_local, JsFuture};
-use web_sys::HtmlInputElement;
+use web_sys::{HtmlInputElement, HtmlSelectElement};
 
-use crate::app::{AppPage, AppState, DraftCategory, WorkdayState, WorkEntry};
+use crate::app::{AppPage, AppState, DraftCategory, TemplateData, WorkdayState, WorkEntry};
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -21,6 +21,26 @@ struct ExportArgs {
 
 pub fn render(state: Arc<AppState>) -> Dom {
     let wd = state.workday.clone();
+    let templates: Arc<MutableVec<TemplateData>> = Arc::new(MutableVec::new());
+
+    {
+        let templates = templates.clone();
+        let folder = state.template_folder.lock_ref().clone();
+        if !folder.is_empty() {
+            spawn_local(async move {
+                #[derive(serde::Serialize)]
+                struct ListArgs { folder: String }
+                if let Ok(args) = tauri_wasm::args(&ListArgs { folder }) {
+                    if let Ok(js_val) = tauri_wasm::invoke("list_templates").with_args(args).await {
+                        if let Ok(list) = serde_wasm_bindgen::from_value::<Vec<TemplateData>>(js_val) {
+                            templates.lock_mut().replace_cloned(list);
+                        }
+                    }
+                }
+            });
+        }
+    }
+
     html!("div", {
         .dwclass!("relative w-full h-screen bg-gray-900 flex flex-col")
         .style("color", "white")
@@ -36,7 +56,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
                 .child(render_date_section(wd.clone()))
                 .child(render_entries_list(wd.clone()))
                 .child(render_add_entry_button(wd.clone()))
-                .child(render_draft_form(wd.clone()))
+                .child(render_draft_form(wd.clone(), templates))
                 .child(render_action_bar(state.clone()))
             }))
         }))
@@ -155,13 +175,68 @@ fn render_add_entry_button(wd: Arc<WorkdayState>) -> Dom {
     })
 }
 
-fn render_draft_form(wd: Arc<WorkdayState>) -> Dom {
+fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateData>>) -> Dom {
     html!("div", {
         .visible_signal(wd.draft_visible.signal())
         .dwclass!("flex flex-col gap-4")
         .style("border", "1px solid #374151")
         .style("border-radius", "6px")
         .style("padding", "16px")
+
+        // Template selector (shown only when templates exist)
+        .child_signal(templates.signal_vec_cloned().to_signal_cloned().map(clone!(wd => move |list| {
+            if list.is_empty() {
+                None
+            } else {
+                let list = Arc::new(list);
+                Some(html!("div", {
+                    .dwclass!("flex items-center gap-4")
+                    .child(html!("label", {
+                        .style("color", "#d1d5db")
+                        .style("font-size", "13px")
+                        .style("width", "80px")
+                        .text("Template")
+                    }))
+                    .child(html!("select" => HtmlSelectElement, {
+                        .style("background", "#374151")
+                        .style("color", "white")
+                        .style("border", "1px solid #4b5563")
+                        .style("border-radius", "4px")
+                        .style("padding", "6px 10px")
+                        .style("font-size", "13px")
+                        .children({
+                            let mut opts = vec![html!("option", {
+                                .attr("value", "")
+                                .text("— select template —")
+                            })];
+                            for (i, t) in list.iter().enumerate() {
+                                opts.push(html!("option", {
+                                    .attr("value", &i.to_string())
+                                    .text(&t.name)
+                                }));
+                            }
+                            opts
+                        })
+                        .with_node!(el => {
+                            .event(clone!(wd, list => move |_: events::Change| {
+                                let val = el.value();
+                                if let Ok(idx) = val.parse::<usize>() {
+                                    if let Some(template) = list.get(idx) {
+                                        wd.draft.categories.lock_mut().clear();
+                                        for (k, v) in &template.categories {
+                                            let cat = DraftCategory::new();
+                                            cat.key.set(k.clone());
+                                            cat.value.set(v.clone());
+                                            wd.draft.categories.lock_mut().push_cloned(cat);
+                                        }
+                                    }
+                                }
+                            }))
+                        })
+                    }))
+                }))
+            }
+        })))
 
         // Hours row
         .child(html!("div", {

@@ -50,6 +50,7 @@ fn render_content(state: Arc<AppState>) -> Dom {
             .dwclass!("flex flex-col gap-6")
             .style("width", "420px")
             .child(render_folder_section(state.clone()))
+            .child(render_template_folder_section(state.clone()))
             .child(render_format_section(state.clone()))
             .child(render_save_button(state.clone()))
         }))
@@ -100,6 +101,61 @@ fn render_folder_section(state: Arc<AppState>) -> Dom {
                                         serde_wasm_bindgen::from_value::<Option<String>>(js_val)
                                     {
                                         state.export_folder.set(path);
+                                    }
+                                }
+                            });
+                        }))
+                    })
+                )
+            })
+        )
+    })
+}
+
+fn render_template_folder_section(state: Arc<AppState>) -> Dom {
+    html!("div", {
+        .dwclass!("flex flex-col gap-2")
+        .child(
+            html!("label", {
+                .dwclass!("text-sm font-medium")
+                .style("color", "#d1d5db")
+                .text("Template Folder")
+            })
+        )
+        .child(
+            html!("div", {
+                .dwclass!("flex items-center gap-4")
+                .child(
+                    html!("span", {
+                        .dwclass!("text-sm")
+                        .style("color", "#9ca3af")
+                        .style("min-width", "200px")
+                        .text_signal(state.template_folder.signal_ref(|folder| {
+                            if folder.is_empty() {
+                                "Not set".to_string()
+                            } else {
+                                folder.clone()
+                            }
+                        }))
+                    })
+                )
+                .child(
+                    html!("button", {
+                        .dwclass!("cursor-pointer text-sm font-medium")
+                        .style("background", "#2563eb")
+                        .style("color", "white")
+                        .style("border", "none")
+                        .style("padding", "6px 12px")
+                        .style("border-radius", "4px")
+                        .text("Browse...")
+                        .event(clone!(state => move |_: events::Click| {
+                            let state = state.clone();
+                            spawn_local(async move {
+                                if let Ok(js_val) = tauri_wasm::invoke("pick_folder").await {
+                                    if let Ok(Some(path)) =
+                                        serde_wasm_bindgen::from_value::<Option<String>>(js_val)
+                                    {
+                                        state.template_folder.set(path);
                                     }
                                 }
                             });

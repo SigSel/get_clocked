@@ -11,6 +11,7 @@ pub enum AppPage {
     Home,
     Settings,
     RegisterWorkday,
+    TemplateMaker,
 }
 
 #[derive(Clone, PartialEq)]
@@ -74,6 +75,37 @@ pub struct WorkEntry {
     pub categories: Vec<(String, String)>,
 }
 
+#[derive(Clone, serde::Deserialize)]
+pub struct TemplateData {
+    pub name: String,
+    pub categories: Vec<(String, String)>,
+}
+
+pub struct TemplateMakerState {
+    pub name: Mutable<String>,
+    pub categories: MutableVec<Arc<DraftCategory>>,
+    pub error_msg: Mutable<Option<String>>,
+    pub status_msg: Mutable<Option<String>>,
+}
+
+impl TemplateMakerState {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            name: Mutable::new(String::new()),
+            categories: MutableVec::new(),
+            error_msg: Mutable::new(None),
+            status_msg: Mutable::new(None),
+        })
+    }
+
+    pub fn reset(&self) {
+        self.name.set(String::new());
+        self.categories.lock_mut().clear();
+        self.error_msg.set(None);
+        self.status_msg.set(None);
+    }
+}
+
 pub struct WorkdayState {
     pub date: Mutable<String>,
     pub draft_visible: Mutable<bool>,
@@ -117,13 +149,17 @@ pub struct AppState {
     pub page: Mutable<AppPage>,
     pub export_folder: Mutable<String>,
     pub export_format: Mutable<ExportFormat>,
+    pub template_folder: Mutable<String>,
     pub workday: Arc<WorkdayState>,
+    pub template_maker: Arc<TemplateMakerState>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 struct Settings {
     export_folder: String,
     export_format: String,
+    #[serde(default)]
+    template_folder: String,
 }
 
 #[derive(serde::Serialize)]
@@ -131,6 +167,7 @@ struct Settings {
 struct SaveArgs {
     export_folder: String,
     export_format: String,
+    template_folder: String,
 }
 
 impl AppState {
@@ -148,7 +185,9 @@ impl AppState {
             page: Mutable::new(AppPage::Home),
             export_folder: Mutable::new(settings.export_folder),
             export_format: Mutable::new(ExportFormat::from_str(&settings.export_format)),
+            template_folder: Mutable::new(settings.template_folder),
             workday: Arc::new(WorkdayState::new()),
+            template_maker: TemplateMakerState::new(),
         }
     }
 
@@ -156,6 +195,7 @@ impl AppState {
         let raw_args = SaveArgs {
             export_folder: state.export_folder.lock_ref().clone(),
             export_format: state.export_format.lock_ref().as_str().to_string(),
+            template_folder: state.template_folder.lock_ref().clone(),
         };
         let args = tauri_wasm::args(&raw_args).map_err(|e| e.to_string())?;
         tauri_wasm::invoke("save_settings")
@@ -173,6 +213,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
                 AppPage::Home => pages::home::render(state.clone()),
                 AppPage::Settings => pages::settings::render(state.clone()),
                 AppPage::RegisterWorkday => pages::register_workday::render(state.clone()),
+                AppPage::TemplateMaker => pages::template_maker::render(state.clone()),
             })
         })))
     })

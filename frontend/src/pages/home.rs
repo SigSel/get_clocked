@@ -45,6 +45,19 @@ pub fn render(state: Arc<AppState>) -> Dom {
                         state.page.set(AppPage::RegisterWorkday);
                     }))
                 }))
+                .child(html!("button", {
+                    .dwclass!("cursor-pointer text-sm font-medium")
+                    .style("background", "none")
+                    .style("color", "#93c5fd")
+                    .style("border", "1px solid #3b82f6")
+                    .style("padding", "8px 24px")
+                    .style("border-radius", "6px")
+                    .text("Templates")
+                    .event(clone!(state => move |_: events::Click| {
+                        state.template_maker.reset();
+                        state.page.set(AppPage::TemplateMaker);
+                    }))
+                }))
             })
         )
     })

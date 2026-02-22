@@ -5,6 +5,8 @@ use tauri::Manager;
 struct Settings {
     export_folder: String,
     export_format: String,
+    #[serde(default)]
+    template_folder: String,
 }
 
 impl Default for Settings {
@@ -12,6 +14,7 @@ impl Default for Settings {
         Settings {
             export_folder: String::new(),
             export_format: "csv".to_string(),
+            template_folder: String::new(),
         }
     }
 }
@@ -38,14 +41,56 @@ fn save_settings(
     app: tauri::AppHandle,
     export_folder: String,
     export_format: String,
+    template_folder: String,
 ) -> Result<(), String> {
     let path = settings_path(&app)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let settings = Settings { export_folder, export_format };
+    let settings = Settings { export_folder, export_format, template_folder };
     let content = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Template {
+    name: String,
+    categories: Vec<(String, String)>,
+}
+
+#[tauri::command]
+fn save_template(folder: String, name: String, categories: Vec<(String, String)>) -> Result<(), String> {
+    std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
+    let sanitized: String = name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == ' ')
+        .collect::<String>()
+        .replace(' ', "_");
+    let path = std::path::Path::new(&folder).join(format!("{}.json", sanitized));
+    let template = Template { name, categories };
+    let content = serde_json::to_string_pretty(&template).map_err(|e| e.to_string())?;
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn list_templates(folder: String) -> Result<Vec<Template>, String> {
+    let dir = std::path::Path::new(&folder);
+    if !dir.exists() {
+        return Ok(vec![]);
+    }
+    let mut templates = Vec::new();
+    let entries = std::fs::read_dir(dir).map_err(|e| e.to_string())?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) == Some("json") {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(t) = serde_json::from_str::<Template>(&content) {
+                    templates.push(t);
+                }
+            }
+        }
+    }
+    Ok(templates)
 }
 
 #[tauri::command]
@@ -146,7 +191,9 @@ fn main() {
             get_settings,
             save_settings,
             pick_folder,
-            export_workday
+            export_workday,
+            save_template,
+            list_templates
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
