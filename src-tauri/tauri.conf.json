@@ -1,6 +1,6 @@
 {
-  "productName": "Get Clocked",
-  "version": "0.1.0",
+  "productName": "get-clocked",
+  "version": "0.1.1",
   "identifier": "com.getclocked.app",
   "build": {
     "beforeDevCommand": "cd frontend && trunk serve",
