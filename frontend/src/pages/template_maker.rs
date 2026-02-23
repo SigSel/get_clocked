@@ -26,24 +26,24 @@ pub fn render(state: Arc<AppState>) -> Dom {
             .dwclass!("flex flex-col items-center justify-center")
             .style("flex", "1")
             .style("overflow-y", "auto")
-            .style("padding", "16px 0")
+            .style("padding", "20px 0")
             .child(html!("div", {
                 .dwclass!("flex flex-col gap-4")
-                .style("width", "480px")
+                .style("width", "640px")
                 .child(render_name_input(tm.clone()))
                 .child(render_categories(tm.clone()))
                 .child(render_add_category_button(tm.clone()))
                 .child_signal(tm.error_msg.signal_ref(|msg| {
                     msg.as_ref().map(|m| html!("span", {
                         .style("color", "#f87171")
-                        .style("font-size", "12px")
+                        .style("font-size", "15px")
                         .text(m)
                     }))
                 }))
                 .child_signal(tm.status_msg.signal_ref(|msg| {
                     msg.as_ref().map(|m| html!("span", {
                         .style("color", "#6ee7b7")
-                        .style("font-size", "13px")
+                        .style("font-size", "16px")
                         .text(m)
                     }))
                 }))
@@ -62,14 +62,14 @@ fn render_header(state: Arc<AppState>) -> Dom {
             .style("border", "none")
             .style("color", "#d1d5db")
             .style("cursor", "pointer")
-            .style("font-size", "14px")
+            .style("font-size", "17px")
             .text("← Back")
             .event(clone!(state => move |_: events::Click| {
                 state.page.set(AppPage::Home);
             }))
         }))
         .child(html!("h2", {
-            .dwclass!("text-lg font-semibold")
+            .dwclass!("text-xl font-semibold")
             .text("Create Template")
         }))
     })
@@ -79,8 +79,9 @@ fn render_name_input(tm: Arc<TemplateMakerState>) -> Dom {
     html!("div", {
         .dwclass!("flex flex-col gap-2")
         .child(html!("label", {
-            .dwclass!("text-sm font-medium")
+            .dwclass!("font-medium")
             .style("color", "#d1d5db")
+            .style("font-size", "16px")
             .text("Template Name")
         }))
         .child(html!("input" => HtmlInputElement, {
@@ -90,8 +91,8 @@ fn render_name_input(tm: Arc<TemplateMakerState>) -> Dom {
             .style("color", "white")
             .style("border", "1px solid #4b5563")
             .style("border-radius", "4px")
-            .style("padding", "8px 12px")
-            .style("font-size", "14px")
+            .style("padding", "10px 16px")
+            .style("font-size", "17px")
             .style("width", "100%")
             .style("box-sizing", "border-box")
             .prop_signal("value", tm.name.signal_cloned())
@@ -123,9 +124,9 @@ fn render_category_row(tm: Arc<TemplateMakerState>, cat: Arc<DraftCategory>) -> 
             .style("color", "white")
             .style("border", "1px solid #4b5563")
             .style("border-radius", "4px")
-            .style("padding", "6px 10px")
-            .style("width", "130px")
-            .style("font-size", "13px")
+            .style("padding", "8px 14px")
+            .style("width", "160px")
+            .style("font-size", "16px")
             .prop_signal("value", cat.key.signal_cloned())
             .with_node!(el => {
                 .event(clone!(cat => move |_: events::Input| {
@@ -140,9 +141,9 @@ fn render_category_row(tm: Arc<TemplateMakerState>, cat: Arc<DraftCategory>) -> 
             .style("color", "white")
             .style("border", "1px solid #4b5563")
             .style("border-radius", "4px")
-            .style("padding", "6px 10px")
-            .style("width", "130px")
-            .style("font-size", "13px")
+            .style("padding", "8px 14px")
+            .style("width", "160px")
+            .style("font-size", "16px")
             .prop_signal("value", cat.value.signal_cloned())
             .with_node!(el => {
                 .event(clone!(cat => move |_: events::Input| {
@@ -171,9 +172,9 @@ fn render_add_category_button(tm: Arc<TemplateMakerState>) -> Dom {
         .style("color", "#60a5fa")
         .style("border", "1px solid #60a5fa")
         .style("border-radius", "4px")
-        .style("padding", "4px 10px")
+        .style("padding", "6px 14px")
         .style("cursor", "pointer")
-        .style("font-size", "12px")
+        .style("font-size", "15px")
         .style("align-self", "flex-start")
         .text("+ Category")
         .event(clone!(tm => move |_: events::Click| {
@@ -184,14 +185,15 @@ fn render_add_category_button(tm: Arc<TemplateMakerState>) -> Dom {
 
 fn render_save_button(state: Arc<AppState>) -> Dom {
     html!("button", {
-        .dwclass!("cursor-pointer text-sm font-semibold")
+        .dwclass!("cursor-pointer font-semibold")
         .style("background", "#16a34a")
         .style("color", "white")
         .style("border", "none")
-        .style("padding", "8px 20px")
+        .style("padding", "10px 26px")
         .style("border-radius", "4px")
         .style("align-self", "flex-start")
         .style("margin-top", "8px")
+        .style("font-size", "16px")
         .text("Save Template")
         .event(clone!(state => move |_: events::Click| {
             let state = state.clone();

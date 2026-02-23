@@ -22,11 +22,12 @@ fn render_header(state: Arc<AppState>) -> Dom {
         .style("border-bottom", "1px solid #374151")
         .child(
             html!("button", {
-                .dwclass!("cursor-pointer text-sm font-medium mr-4")
+                .dwclass!("cursor-pointer font-medium mr-4")
                 .style("background", "none")
                 .style("border", "none")
                 .style("color", "#d1d5db")
-                .style("padding", "4px 8px")
+                .style("padding", "6px 12px")
+                .style("font-size", "16px")
                 .text("← Back")
                 .event(clone!(state => move |_: events::Click| {
                     state.page.set(AppPage::Home);
@@ -35,7 +36,7 @@ fn render_header(state: Arc<AppState>) -> Dom {
         )
         .child(
             html!("h2", {
-                .dwclass!("text-lg font-semibold text-white")
+                .dwclass!("text-xl font-semibold text-white")
                 .text("Settings")
             })
         )
@@ -48,7 +49,7 @@ fn render_content(state: Arc<AppState>) -> Dom {
         .style("flex", "1")
         .child(html!("div", {
             .dwclass!("flex flex-col gap-6")
-            .style("width", "420px")
+            .style("width", "560px")
             .child(render_folder_section(state.clone()))
             .child(render_template_folder_section(state.clone()))
             .child(render_format_section(state.clone()))
@@ -62,8 +63,9 @@ fn render_folder_section(state: Arc<AppState>) -> Dom {
         .dwclass!("flex flex-col gap-2")
         .child(
             html!("label", {
-                .dwclass!("text-sm font-medium")
+                .dwclass!("font-medium")
                 .style("color", "#d1d5db")
+                .style("font-size", "16px")
                 .text("Export Folder")
             })
         )
@@ -72,9 +74,9 @@ fn render_folder_section(state: Arc<AppState>) -> Dom {
                 .dwclass!("flex items-center gap-4")
                 .child(
                     html!("span", {
-                        .dwclass!("text-sm")
                         .style("color", "#9ca3af")
-                        .style("min-width", "200px")
+                        .style("min-width", "260px")
+                        .style("font-size", "16px")
                         .text_signal(state.export_folder.signal_ref(|folder| {
                             if folder.is_empty() {
                                 "Not set".to_string()
@@ -86,12 +88,13 @@ fn render_folder_section(state: Arc<AppState>) -> Dom {
                 )
                 .child(
                     html!("button", {
-                        .dwclass!("cursor-pointer text-sm font-medium")
+                        .dwclass!("cursor-pointer font-medium")
                         .style("background", "#2563eb")
                         .style("color", "white")
                         .style("border", "none")
-                        .style("padding", "6px 12px")
+                        .style("padding", "8px 16px")
                         .style("border-radius", "4px")
+                        .style("font-size", "16px")
                         .text("Browse...")
                         .event(clone!(state => move |_: events::Click| {
                             let state = state.clone();
@@ -117,8 +120,9 @@ fn render_template_folder_section(state: Arc<AppState>) -> Dom {
         .dwclass!("flex flex-col gap-2")
         .child(
             html!("label", {
-                .dwclass!("text-sm font-medium")
+                .dwclass!("font-medium")
                 .style("color", "#d1d5db")
+                .style("font-size", "16px")
                 .text("Template Folder")
             })
         )
@@ -127,9 +131,9 @@ fn render_template_folder_section(state: Arc<AppState>) -> Dom {
                 .dwclass!("flex items-center gap-4")
                 .child(
                     html!("span", {
-                        .dwclass!("text-sm")
                         .style("color", "#9ca3af")
-                        .style("min-width", "200px")
+                        .style("min-width", "260px")
+                        .style("font-size", "16px")
                         .text_signal(state.template_folder.signal_ref(|folder| {
                             if folder.is_empty() {
                                 "Not set".to_string()
@@ -141,12 +145,13 @@ fn render_template_folder_section(state: Arc<AppState>) -> Dom {
                 )
                 .child(
                     html!("button", {
-                        .dwclass!("cursor-pointer text-sm font-medium")
+                        .dwclass!("cursor-pointer font-medium")
                         .style("background", "#2563eb")
                         .style("color", "white")
                         .style("border", "none")
-                        .style("padding", "6px 12px")
+                        .style("padding", "8px 16px")
                         .style("border-radius", "4px")
+                        .style("font-size", "16px")
                         .text("Browse...")
                         .event(clone!(state => move |_: events::Click| {
                             let state = state.clone();
@@ -174,8 +179,9 @@ fn render_format_section(state: Arc<AppState>) -> Dom {
         .dwclass!("flex flex-col gap-2")
         .child(
             html!("label", {
-                .dwclass!("text-sm font-medium")
+                .dwclass!("font-medium")
                 .style("color", "#d1d5db")
+                .style("font-size", "16px")
                 .text("Export Format")
             })
         )
@@ -185,9 +191,9 @@ fn render_format_section(state: Arc<AppState>) -> Dom {
                 .style("color", "white")
                 .style("border", "1px solid #4b5563")
                 .style("border-radius", "4px")
-                .style("padding", "6px 12px")
-                .style("font-size", "0.875rem")
-                .style("width", "200px")
+                .style("padding", "8px 16px")
+                .style("font-size", "1rem")
+                .style("width", "260px")
                 .children(&mut [
                     html!("option", {
                         .attr("value", "csv")
@@ -224,14 +230,15 @@ fn render_format_section(state: Arc<AppState>) -> Dom {
 
 fn render_save_button(state: Arc<AppState>) -> Dom {
     html!("button", {
-        .dwclass!("cursor-pointer text-sm font-medium")
+        .dwclass!("cursor-pointer font-medium")
         .style("background", "#16a34a")
         .style("color", "white")
         .style("border", "none")
-        .style("padding", "8px 20px")
+        .style("padding", "10px 26px")
         .style("border-radius", "4px")
         .style("align-self", "flex-start")
         .style("margin-top", "8px")
+        .style("font-size", "16px")
         .text("Save")
         .event(clone!(state => move |_: events::Click| {
             let state = state.clone();

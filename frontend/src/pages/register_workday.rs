@@ -5,6 +5,7 @@ use dwind::prelude::*;
 use dwind_macros::dwclass;
 use futures_signals::signal::SignalExt;
 use futures_signals::signal_vec::{MutableVec, SignalVecExt};
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{HtmlInputElement, HtmlSelectElement};
 
@@ -44,15 +45,28 @@ pub fn render(state: Arc<AppState>) -> Dom {
     html!("div", {
         .dwclass!("relative w-full h-screen bg-gray-900 flex flex-col")
         .style("color", "white")
+        .event(|_: events::MouseDown| {
+            if let Some(window) = web_sys::window() {
+                if let Some(doc) = window.document() {
+                    if let Some(active) = doc.active_element() {
+                        if let Ok(input) = active.dyn_into::<HtmlInputElement>() {
+                            if input.type_() == "date" {
+                                let _ = input.blur();
+                            }
+                        }
+                    }
+                }
+            }
+        })
         .child(render_header(state.clone()))
         .child(html!("div", {
             .dwclass!("flex flex-col items-center")
             .style("overflow-y", "auto")
             .style("flex", "1")
-            .style("padding", "16px 0")
+            .style("padding", "20px 0")
             .child(html!("div", {
                 .dwclass!("flex flex-col gap-4")
-                .style("width", "520px")
+                .style("width", "680px")
                 .child(render_date_section(wd.clone()))
                 .child(render_entries_list(wd.clone()))
                 .child(render_add_entry_button(wd.clone()))
@@ -72,7 +86,7 @@ fn render_header(state: Arc<AppState>) -> Dom {
             .style("border", "none")
             .style("color", "#d1d5db")
             .style("cursor", "pointer")
-            .style("font-size", "14px")
+            .style("font-size", "17px")
             .text("← Back")
             .event(clone!(state => move |_: events::Click| {
                 state.workday.reset();
@@ -80,7 +94,7 @@ fn render_header(state: Arc<AppState>) -> Dom {
             }))
         }))
         .child(html!("h2", {
-            .dwclass!("text-lg font-semibold")
+            .dwclass!("text-xl font-semibold")
             .text("Register Workday")
         }))
     })
@@ -91,7 +105,7 @@ fn render_date_section(wd: Arc<WorkdayState>) -> Dom {
         .dwclass!("flex items-center gap-4")
         .child(html!("label", {
             .style("color", "#d1d5db")
-            .style("font-size", "14px")
+            .style("font-size", "17px")
             .text("Date")
         }))
         .child(html!("input" => HtmlInputElement, {
@@ -100,12 +114,13 @@ fn render_date_section(wd: Arc<WorkdayState>) -> Dom {
             .style("color", "white")
             .style("border", "1px solid #4b5563")
             .style("border-radius", "4px")
-            .style("padding", "6px 10px")
-            .style("font-size", "14px")
+            .style("padding", "8px 14px")
+            .style("font-size", "17px")
             .prop_signal("value", wd.date.signal_cloned())
             .with_node!(el => {
                 .event(clone!(wd => move |_: events::Input| {
                     wd.date.set(el.value());
+                    let _ = el.blur();
                 }))
             })
         }))
@@ -117,7 +132,7 @@ fn render_entries_list(wd: Arc<WorkdayState>) -> Dom {
         .dwclass!("flex flex-col gap-2")
         .child(html!("div", {
             .dwclass!("flex items-center gap-2")
-            .style("font-size", "13px")
+            .style("font-size", "16px")
             .child(html!("span", {
                 .style("color", "#9ca3af")
                 .text("Total hours:")
@@ -133,8 +148,8 @@ fn render_entries_list(wd: Arc<WorkdayState>) -> Dom {
                 .dwclass!("flex items-center gap-4")
                 .style("background", "#1f2937")
                 .style("border-radius", "4px")
-                .style("padding", "8px 12px")
-                .style("font-size", "13px")
+                .style("padding", "10px 16px")
+                .style("font-size", "16px")
                 .child(html!("span", {
                     .style("color", "#a3e635")
                     .style("font-weight", "600")
@@ -162,9 +177,9 @@ fn render_add_entry_button(wd: Arc<WorkdayState>) -> Dom {
                     .style("color", "white")
                     .style("border", "none")
                     .style("border-radius", "4px")
-                    .style("padding", "6px 14px")
+                    .style("padding", "8px 18px")
                     .style("cursor", "pointer")
-                    .style("font-size", "13px")
+                    .style("font-size", "16px")
                     .text("+ Add Entry")
                     .event(clone!(wd => move |_: events::Click| {
                         wd.draft_visible.set(true);
@@ -181,7 +196,7 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
         .dwclass!("flex flex-col gap-4")
         .style("border", "1px solid #374151")
         .style("border-radius", "6px")
-        .style("padding", "16px")
+        .style("padding", "20px")
 
         // Template selector (shown only when templates exist)
         .child_signal(templates.signal_vec_cloned().to_signal_cloned().map(clone!(wd => move |list| {
@@ -193,8 +208,8 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
                     .dwclass!("flex items-center gap-4")
                     .child(html!("label", {
                         .style("color", "#d1d5db")
-                        .style("font-size", "13px")
-                        .style("width", "80px")
+                        .style("font-size", "16px")
+                        .style("width", "100px")
                         .text("Template")
                     }))
                     .child(html!("select" => HtmlSelectElement, {
@@ -202,8 +217,8 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
                         .style("color", "white")
                         .style("border", "1px solid #4b5563")
                         .style("border-radius", "4px")
-                        .style("padding", "6px 10px")
-                        .style("font-size", "13px")
+                        .style("padding", "8px 14px")
+                        .style("font-size", "16px")
                         .children({
                             let mut opts = vec![html!("option", {
                                 .attr("value", "")
@@ -243,8 +258,8 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
             .dwclass!("flex items-center gap-4")
             .child(html!("label", {
                 .style("color", "#d1d5db")
-                .style("font-size", "13px")
-                .style("width", "50px")
+                .style("font-size", "16px")
+                .style("width", "65px")
                 .text("Hours")
             }))
             .child(html!("input" => HtmlInputElement, {
@@ -255,9 +270,9 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
                 .style("color", "white")
                 .style("border", "1px solid #4b5563")
                 .style("border-radius", "4px")
-                .style("padding", "6px 10px")
-                .style("width", "90px")
-                .style("font-size", "13px")
+                .style("padding", "8px 14px")
+                .style("width", "110px")
+                .style("font-size", "16px")
                 .prop_signal("value", wd.draft.hours.signal_cloned())
                 .with_node!(el => {
                     .event(clone!(wd => move |_: events::Input| {
@@ -281,9 +296,9 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
             .style("color", "#60a5fa")
             .style("border", "1px solid #60a5fa")
             .style("border-radius", "4px")
-            .style("padding", "4px 10px")
+            .style("padding", "6px 14px")
             .style("cursor", "pointer")
-            .style("font-size", "12px")
+            .style("font-size", "15px")
             .style("align-self", "flex-start")
             .text("+ Category")
             .event(clone!(wd => move |_: events::Click| {
@@ -295,7 +310,7 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
         .child_signal(wd.error_msg.signal_ref(|msg| {
             msg.as_ref().map(|m| html!("span", {
                 .style("color", "#f87171")
-                .style("font-size", "12px")
+                .style("font-size", "15px")
                 .text(m)
             }))
         }))
@@ -309,9 +324,9 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
                 .style("color", "#9ca3af")
                 .style("border", "1px solid #4b5563")
                 .style("border-radius", "4px")
-                .style("padding", "6px 12px")
+                .style("padding", "8px 18px")
                 .style("cursor", "pointer")
-                .style("font-size", "13px")
+                .style("font-size", "16px")
                 .text("Cancel")
                 .event(clone!(wd => move |_: events::Click| {
                     wd.draft.reset();
@@ -333,9 +348,9 @@ fn render_category_row(wd: Arc<WorkdayState>, cat: Arc<DraftCategory>) -> Dom {
             .style("color", "white")
             .style("border", "1px solid #4b5563")
             .style("border-radius", "4px")
-            .style("padding", "6px 10px")
-            .style("width", "130px")
-            .style("font-size", "13px")
+            .style("padding", "8px 14px")
+            .style("width", "160px")
+            .style("font-size", "16px")
             .prop_signal("value", cat.key.signal_cloned())
             .with_node!(el => {
                 .event(clone!(cat => move |_: events::Input| {
@@ -350,9 +365,9 @@ fn render_category_row(wd: Arc<WorkdayState>, cat: Arc<DraftCategory>) -> Dom {
             .style("color", "white")
             .style("border", "1px solid #4b5563")
             .style("border-radius", "4px")
-            .style("padding", "6px 10px")
-            .style("width", "130px")
-            .style("font-size", "13px")
+            .style("padding", "8px 14px")
+            .style("width", "160px")
+            .style("font-size", "16px")
             .prop_signal("value", cat.value.signal_cloned())
             .with_node!(el => {
                 .event(clone!(cat => move |_: events::Input| {
@@ -381,9 +396,9 @@ fn render_commit_button(wd: Arc<WorkdayState>) -> Dom {
         .style("color", "white")
         .style("border", "none")
         .style("border-radius", "4px")
-        .style("padding", "6px 14px")
+        .style("padding", "8px 18px")
         .style("cursor", "pointer")
-        .style("font-size", "13px")
+        .style("font-size", "16px")
         .text("Add")
         .event(clone!(wd => move |_: events::Click| {
             let hours_str = wd.draft.hours.lock_ref().clone();
@@ -421,7 +436,7 @@ fn render_action_bar(state: Arc<AppState>) -> Dom {
         .child_signal(wd.status_msg.signal_ref(|msg| {
             msg.as_ref().map(|m| html!("span", {
                 .style("color", "#6ee7b7")
-                .style("font-size", "13px")
+                .style("font-size", "16px")
                 .text(m)
             }))
         }))
@@ -433,9 +448,9 @@ fn render_action_bar(state: Arc<AppState>) -> Dom {
                 .style("color", "white")
                 .style("border", "1px solid #4b5563")
                 .style("border-radius", "4px")
-                .style("padding", "6px 14px")
+                .style("padding", "8px 18px")
                 .style("cursor", "pointer")
-                .style("font-size", "13px")
+                .style("font-size", "16px")
                 .text("Copy to Clipboard")
                 .event(clone!(wd => move |_: events::Click| {
                     let entries = wd.entries.lock_ref().to_vec();
@@ -453,9 +468,9 @@ fn render_action_bar(state: Arc<AppState>) -> Dom {
                 .style("color", "white")
                 .style("border", "none")
                 .style("border-radius", "4px")
-                .style("padding", "6px 14px")
+                .style("padding", "8px 18px")
                 .style("cursor", "pointer")
-                .style("font-size", "13px")
+                .style("font-size", "16px")
                 .text("Export")
                 .event(clone!(state => move |_: events::Click| {
                     let state = state.clone();
