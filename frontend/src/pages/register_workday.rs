@@ -271,9 +271,8 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
                 .text("Hours")
             }))
             .child(html!("input" => HtmlInputElement, {
-                .attr("type", "number")
-                .attr("min", "0")
-                .attr("step", "0.5")
+                .attr("type", "text")
+                .attr("inputmode", "decimal")
                 .style("background", "#374151")
                 .style("color", "white")
                 .style("border", "1px solid #4b5563")
