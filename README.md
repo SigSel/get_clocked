@@ -5,10 +5,10 @@ A cross-platform desktop time-tracking app built with Tauri 2 and a Rust/WASM fr
 ## Screenshots
 
 ### Home
-![Home screen](assets/home.png)
+![Home screen](assets/home.jpg)
 
 ### Register Workday
-![Register workday screen](assets/register-workday.png)
+![Register workday screen](assets/register-workday.jpg)
 
 ## Features
 
