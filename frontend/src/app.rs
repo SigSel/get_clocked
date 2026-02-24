@@ -114,6 +114,7 @@ pub struct WorkdayState {
     pub total_hours: Mutable<f64>,
     pub error_msg: Mutable<Option<String>>,
     pub status_msg: Mutable<Option<String>>,
+    pub include_monthly: Mutable<bool>,
 }
 
 impl WorkdayState {
@@ -126,6 +127,7 @@ impl WorkdayState {
             total_hours: Mutable::new(0.0),
             error_msg: Mutable::new(None),
             status_msg: Mutable::new(None),
+            include_monthly: Mutable::new(false),
         }
     }
 
@@ -137,6 +139,7 @@ impl WorkdayState {
         self.total_hours.set(0.0);
         self.error_msg.set(None);
         self.status_msg.set(None);
+        self.include_monthly.set(false);
     }
 }
 

@@ -184,6 +184,143 @@ fn export_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Res
     wb.save(path).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn export_monthly(folder: String, format: String, date: String, entries: Vec<WorkEntry>) -> Result<(), String> {
+    let folder_path = std::path::Path::new(&folder);
+    if !folder_path.exists() {
+        return Err(format!("Export folder does not exist: {}", folder));
+    }
+    let month = &date[..7]; // "YYYY-MM" from "YYYY-MM-DD"
+    match format.as_str() {
+        "xlsx" => {
+            let path = folder_path.join(format!("monthly_{}.xlsx", month));
+            export_monthly_xlsx(&path, &entries, &date)
+        }
+        _ => {
+            let path = folder_path.join(format!("monthly_{}.csv", month));
+            export_monthly_csv(&path, &entries, &date)
+        }
+    }
+}
+
+fn export_monthly_csv(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Result<(), String> {
+    if path.exists() {
+        let mut rdr = csv::Reader::from_path(path).map_err(|e| e.to_string())?;
+        let raw_headers = rdr.headers().map_err(|e| e.to_string())?;
+        let cols: Vec<String> = raw_headers.iter()
+            .skip(1)
+            .filter(|h| *h != "Hours")
+            .map(|h| h.to_string())
+            .collect();
+        drop(rdr);
+
+        let file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(path)
+            .map_err(|e| e.to_string())?;
+        let mut wtr = csv::Writer::from_writer(file);
+        write_monthly_rows(&mut wtr, entries, &cols, date)?;
+        wtr.flush().map_err(|e| e.to_string())
+    } else {
+        let cols = collect_columns(entries);
+        let mut wtr = csv::Writer::from_path(path).map_err(|e| e.to_string())?;
+        let mut header = vec!["Date".to_string()];
+        header.extend_from_slice(&cols);
+        header.push("Hours".to_string());
+        wtr.write_record(&header).map_err(|e| e.to_string())?;
+        write_monthly_rows(&mut wtr, entries, &cols, date)?;
+        wtr.flush().map_err(|e| e.to_string())
+    }
+}
+
+fn write_monthly_rows<W: std::io::Write>(
+    wtr: &mut csv::Writer<W>,
+    entries: &[WorkEntry],
+    cols: &[String],
+    date: &str,
+) -> Result<(), String> {
+    for e in entries {
+        let map: std::collections::HashMap<&str, &str> =
+            e.categories.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        let mut row = vec![date.to_string()];
+        for col in cols {
+            row.push(map.get(col.as_str()).unwrap_or(&"").to_string());
+        }
+        row.push(format!("{:.1}", e.hours));
+        wtr.write_record(&row).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+fn export_monthly_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Result<(), String> {
+    use rust_xlsxwriter::{Format, Workbook};
+
+    let (merged_cols, existing_rows): (Vec<String>, Vec<Vec<String>>) = if path.exists() {
+        use calamine::{open_workbook, Data, Reader, Xlsx};
+        let mut wb: Xlsx<_> = open_workbook(path).map_err(|e: calamine::XlsxError| e.to_string())?;
+        let range = wb.worksheet_range_at(0)
+            .ok_or("No worksheets in existing monthly file")?
+            .map_err(|e: calamine::XlsxError| e.to_string())?;
+
+        let all_rows: Vec<Vec<String>> = range.rows().map(|row: &[Data]| {
+            row.iter().map(|cell| match cell {
+                Data::String(s) => s.clone(),
+                Data::Float(f) => format!("{:.1}", f),
+                Data::Int(i) => i.to_string(),
+                _ => String::new(),
+            }).collect()
+        }).collect();
+
+        let existing_cols: Vec<String> = all_rows.get(0)
+            .map(|h: &Vec<String>| h.iter().skip(1).filter(|c: &&String| c.as_str() != "Hours").cloned().collect())
+            .unwrap_or_default();
+
+        let new_cols = collect_columns(entries);
+        let mut merged = existing_cols;
+        for c in new_cols {
+            if !merged.contains(&c) { merged.push(c); }
+        }
+
+        let data_rows: Vec<Vec<String>> = all_rows.into_iter().skip(1).collect();
+        (merged, data_rows)
+    } else {
+        (collect_columns(entries), vec![])
+    };
+
+    let mut wb = Workbook::new();
+    let ws = wb.add_worksheet();
+    let bold = Format::new().set_bold();
+
+    ws.write_with_format(0, 0, "Date", &bold).map_err(|e| e.to_string())?;
+    for (i, col) in merged_cols.iter().enumerate() {
+        ws.write_with_format(0, (i + 1) as u16, col.as_str(), &bold).map_err(|e| e.to_string())?;
+    }
+    ws.write_with_format(0, (merged_cols.len() + 1) as u16, "Hours", &bold).map_err(|e| e.to_string())?;
+
+    let existing_col_count = merged_cols.len() + 2;
+    for (ri, row) in existing_rows.iter().enumerate() {
+        let excel_row = (ri + 1) as u32;
+        for (ci, val) in row.iter().enumerate().take(existing_col_count) {
+            ws.write(excel_row, ci as u16, val.as_str()).map_err(|e| e.to_string())?;
+        }
+    }
+
+    let row_offset = existing_rows.len() + 1;
+    for (ri, e) in entries.iter().enumerate() {
+        let excel_row = (row_offset + ri) as u32;
+        ws.write(excel_row, 0, date).map_err(|e| e.to_string())?;
+        let map: std::collections::HashMap<&str, &str> =
+            e.categories.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
+        for (ci, col) in merged_cols.iter().enumerate() {
+            ws.write(excel_row, (ci + 1) as u16, *map.get(col.as_str()).unwrap_or(&""))
+                .map_err(|e| e.to_string())?;
+        }
+        ws.write(excel_row, (merged_cols.len() + 1) as u16, e.hours).map_err(|e| e.to_string())?;
+    }
+
+    wb.save(path).map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -192,6 +329,7 @@ fn main() {
             save_settings,
             pick_folder,
             export_workday,
+            export_monthly,
             save_template,
             list_templates
         ])

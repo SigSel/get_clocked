@@ -20,6 +20,14 @@ struct ExportArgs {
     entries: Vec<WorkEntry>,
 }
 
+#[derive(serde::Serialize)]
+struct MonthlyArgs {
+    folder: String,
+    format: String,
+    date: String,
+    entries: Vec<WorkEntry>,
+}
+
 pub fn render(state: Arc<AppState>) -> Dom {
     let wd = state.workday.clone();
     let templates: Arc<MutableVec<TemplateData>> = Arc::new(MutableVec::new());
@@ -442,7 +450,7 @@ fn render_action_bar(state: Arc<AppState>) -> Dom {
         }))
 
         .child(html!("div", {
-            .dwclass!("flex gap-4")
+            .dwclass!("flex gap-4 items-center")
             .child(html!("button", {
                 .style("background", "#374151")
                 .style("color", "white")
@@ -476,6 +484,25 @@ fn render_action_bar(state: Arc<AppState>) -> Dom {
                     let state = state.clone();
                     spawn_local(async move { do_export(state).await; });
                 }))
+            }))
+            .child(html!("label", {
+                .dwclass!("flex items-center gap-2 cursor-pointer")
+                .style("color", "#d1d5db")
+                .style("font-size", "15px")
+                .children([
+                    html!("input" => HtmlInputElement, {
+                        .attr("type", "checkbox")
+                        .prop_signal("checked", wd.include_monthly.signal())
+                        .with_node!(elem => {
+                            .event(clone!(wd => move |_: events::Change| {
+                                wd.include_monthly.set(elem.checked());
+                            }))
+                        })
+                    }),
+                    html!("span", {
+                        .text("Export to monthly overview")
+                    }),
+                ])
             }))
         }))
     })
@@ -556,11 +583,13 @@ async fn do_export(state: Arc<AppState>) {
         }
     };
 
+    let format = state.export_format.lock_ref().as_str().to_string();
+    let date = wd.date.lock_ref().clone();
     let raw_args = ExportArgs {
-        folder,
-        format: state.export_format.lock_ref().as_str().to_string(),
-        date: wd.date.lock_ref().clone(),
-        entries,
+        folder: folder.clone(),
+        format: format.clone(),
+        date: date.clone(),
+        entries: entries.clone(),
     };
     let args = match tauri_wasm::args(&raw_args) {
         Ok(a) => a,
@@ -570,7 +599,15 @@ async fn do_export(state: Arc<AppState>) {
         }
     };
     match tauri_wasm::invoke("export_workday").with_args(args).await {
-        Ok(_) => wd.status_msg.set(Some("Exported!".to_string())),
+        Ok(_) => {
+            wd.status_msg.set(Some("Exported!".to_string()));
+            if wd.include_monthly.get() {
+                let monthly_args = MonthlyArgs { folder, format, date, entries };
+                if let Ok(args) = tauri_wasm::args(&monthly_args) {
+                    let _ = tauri_wasm::invoke("export_monthly").with_args(args).await;
+                };
+            }
+        }
         Err(e) => wd.status_msg.set(Some(format!("Export failed: {:?}", e))),
     }
 }
