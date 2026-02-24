@@ -6,7 +6,7 @@ A multi-page dark-themed desktop app built with Tauri 2 (native shell) and a Rus
 
 **Two-crate Cargo workspace:**
 - `frontend/` — frontend compiled to WASM via Trunk. Organized into a `pages/` module with four pages: `Home`, `Settings`, `RegisterWorkday`, and `TemplateMaker`. Uses `dominator` for reactive DOM, `dwind` for Tailwind-style utility classes, and `futures-signals` for reactivity.
-- `src-tauri/` — Tauri 2 native backend. Handles the app window and will expose Tauri commands to the frontend via `tauri-wasm`.
+- `src-tauri/` — Tauri 2 native backend. Handles the app window and exposes Tauri commands to the frontend via `tauri-wasm`.
 
 **Build pipeline:** Trunk bundles the WASM frontend into `frontend/dist/`, which Tauri serves as the app's UI.
 
@@ -20,6 +20,11 @@ A multi-page dark-themed desktop app built with Tauri 2 (native shell) and a Rus
 | `tauri-wasm` | Call Tauri commands from WASM frontend |
 | `wasm-bindgen` | Rust ↔ JS interop |
 | `tauri` 2 | Native app shell (backend) |
+| `tauri-plugin-dialog` | Native file/folder picker dialogs |
+| `rust_xlsxwriter` | XLSX file generation |
+| `csv` | CSV file generation |
+| `serde` + `serde_json` | Serialization/deserialization |
+| `web-sys` | Browser/DOM APIs (clipboard, inputs) |
 
 ## Dev Commands
 
@@ -38,6 +43,9 @@ cargo tauri build
 
 ```
 Cargo.toml          # Workspace root
+.github/workflows/
+  ci.yml            # CI: cross-platform build verification
+  release.yml       # Release: builds + GitHub Release on version tags
 frontend/
   Cargo.toml        # Frontend WASM crate
   index.html        # Trunk entry point (links the Rust crate)
@@ -55,15 +63,19 @@ frontend/
 src-tauri/
   src/main.rs       # Tauri backend entrypoint
   tauri.conf.json   # App config (name, window size, build commands)
-  Cargo.toml        # Backend crate
+  Cargo.toml        # Backend crate (v0.1.3)
+  capabilities/     # Tauri permission capabilities
+  icons/            # App icons (PNG, ICNS, ICO)
 target/             # Rust build artifacts (gitignored)
 ```
 
 ## App Config
 
+- Version: 0.1.3
 - Window: 900×600, title "Get Clocked"
 - Identifier: `com.getclocked.app`
 - Dev URL: `http://localhost:8080` (Trunk)
+- Platforms: Linux (AppImage), Windows (NSIS), macOS (DMG)
 
 **Backend commands:** `get_settings`, `save_settings`, `pick_folder`, `export_workday`, `save_template`, `list_templates`
 

@@ -1,6 +1,14 @@
 # Get Clocked
 
-A desktop time-tracking app built with Tauri 2 and a Rust/WASM frontend.
+A cross-platform desktop time-tracking app built with Tauri 2 and a Rust/WASM frontend. Available for Linux, Windows, and macOS.
+
+## Screenshots
+
+### Home
+![Home screen](assets/home.png)
+
+### Register Workday
+![Register workday screen](assets/register-workday.png)
 
 ## Features
 
@@ -40,9 +48,17 @@ src-tauri/
 
 **Prerequisites:**
 
-- Rust toolchain (`rustup`)
+- Rust toolchain (`rustup`) with the `wasm32-unknown-unknown` target (`rustup target add wasm32-unknown-unknown`)
 - `trunk` — WASM bundler: `cargo install trunk`
 - Tauri CLI: `cargo install tauri-cli`
+- Linux only: system libraries
+  ```sh
+  sudo apt-get install -y \
+    libwebkit2gtk-4.1-dev \
+    libappindicator3-dev \
+    librsvg2-dev \
+    patchelf
+  ```
 
 **Dev commands:**
 
@@ -57,7 +73,13 @@ cd frontend && trunk serve
 cargo tauri build
 ```
 
+## CI/CD
+
+- **CI** — Builds and verifies on Linux, Windows, and macOS on every push to `main`
+- **Release** — Triggered by version tags (`v*`), creates a GitHub Release with platform binaries (AppImage, .exe, .dmg)
+
 ## App Window
 
 - Size: 900×600
 - Theme: dark
+- Version: 0.1.3
