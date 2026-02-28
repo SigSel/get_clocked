@@ -12,12 +12,15 @@ A cross-platform desktop time-tracking app built with Tauri 2 and a Rust/WASM fr
 
 ## Features
 
-- Register daily work entries with hours and category tags (Project, Task)
+- Register daily work entries with hours and user-defined category tags
 - Live total-hours display
 - Copy workday data to clipboard as TSV
 - Export to CSV or XLSX — files named `workday_{date}.csv` / `workday_{date}.xlsx`
+- Optionally append entries to a running monthly overview sheet (`monthly_{YYYY-MM}.csv` / `.xlsx`)
 - Create reusable category templates via the Template Maker page
 - Template selector in the draft entry form pre-populates categories from a saved template
+- Define reusable category names and allowed values via the Category Manager page
+- Import category definitions from existing CSV/XLSX files
 - Persistent settings: export folder, export format, and template folder
 
 ## Tech Stack
@@ -30,6 +33,7 @@ A cross-platform desktop time-tracking app built with Tauri 2 and a Rust/WASM fr
 | `dwind` | Tailwind-style utility CSS |
 | `futures-signals` | Reactive state/signals |
 | `rust_xlsxwriter` + `csv` | File export (XLSX and CSV) |
+| `calamine` | Read CSV/XLSX for category import |
 
 ## Project Structure
 

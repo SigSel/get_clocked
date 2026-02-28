@@ -5,7 +5,7 @@ A multi-page dark-themed desktop app built with Tauri 2 (native shell) and a Rus
 ## Architecture
 
 **Two-crate Cargo workspace:**
-- `frontend/` — frontend compiled to WASM via Trunk. Organized into a `pages/` module with four pages: `Home`, `Settings`, `RegisterWorkday`, and `TemplateMaker`. Uses `dominator` for reactive DOM, `dwind` for Tailwind-style utility classes, and `futures-signals` for reactivity.
+- `frontend/` — frontend compiled to WASM via Trunk. Organized into a `pages/` module with five pages: `Home`, `Settings`, `RegisterWorkday`, `TemplateMaker`, and `CategoryManager`. Uses `dominator` for reactive DOM, `dwind` for Tailwind-style utility classes, and `futures-signals` for reactivity.
 - `src-tauri/` — Tauri 2 native backend. Handles the app window and exposes Tauri commands to the frontend via `tauri-wasm`.
 
 **Build pipeline:** Trunk bundles the WASM frontend into `frontend/dist/`, which Tauri serves as the app's UI.
@@ -59,6 +59,7 @@ frontend/
       settings.rs
       register_workday.rs
       template_maker.rs
+      category_manager.rs
   dist/             # Trunk build output (gitignored)
 src-tauri/
   src/main.rs       # Tauri backend entrypoint
@@ -77,9 +78,11 @@ target/             # Rust build artifacts (gitignored)
 - Dev URL: `http://localhost:8080` (Trunk)
 - Platforms: Linux (AppImage), Windows (NSIS), macOS (DMG)
 
-**Backend commands:** `get_settings`, `save_settings`, `pick_folder`, `export_workday`, `save_template`, `list_templates`
+**Backend commands:** `get_settings`, `save_settings`, `pick_folder`, `export_workday`, `export_monthly`, `save_template`, `list_templates`, `get_categories`, `save_categories`, `pick_categories_file`, `import_categories`
 
 **Settings** (`$APP_CONFIG_DIR/settings.json`): `export_folder`, `export_format`, `template_folder`
+
+**Category definitions** (`$APP_CONFIG_DIR/category_definitions.json`): list of `{ name, values[] }` entries used for autocomplete in RegisterWorkday and TemplateMaker; can be imported from CSV/XLSX via CategoryManager.
 
 ---
 
