@@ -136,6 +136,8 @@ pub struct TemplateMakerState {
     pub categories: MutableVec<Arc<DraftCategory>>,
     pub error_msg: Mutable<Option<String>>,
     pub status_msg: Mutable<Option<String>>,
+    pub templates: MutableVec<TemplateData>,
+    pub editing_original_name: Mutable<Option<String>>,
 }
 
 impl TemplateMakerState {
@@ -145,6 +147,8 @@ impl TemplateMakerState {
             categories: MutableVec::new(),
             error_msg: Mutable::new(None),
             status_msg: Mutable::new(None),
+            templates: MutableVec::new(),
+            editing_original_name: Mutable::new(None),
         })
     }
 
@@ -153,6 +157,7 @@ impl TemplateMakerState {
         self.categories.lock_mut().clear();
         self.error_msg.set(None);
         self.status_msg.set(None);
+        self.editing_original_name.set(None);
     }
 }
 

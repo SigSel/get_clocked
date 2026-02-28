@@ -78,7 +78,7 @@ target/             # Rust build artifacts (gitignored)
 - Dev URL: `http://localhost:8080` (Trunk)
 - Platforms: Linux (AppImage), Windows (NSIS), macOS (DMG)
 
-**Backend commands:** `get_settings`, `save_settings`, `pick_folder`, `export_workday`, `export_monthly`, `save_template`, `list_templates`, `get_categories`, `save_categories`, `pick_categories_file`, `import_categories`
+**Backend commands:** `get_settings`, `save_settings`, `pick_folder`, `export_workday`, `export_monthly`, `save_template`, `list_templates`, `delete_template`, `get_categories`, `save_categories`, `pick_categories_file`, `import_categories`
 
 **Settings** (`$APP_CONFIG_DIR/settings.json`): `export_folder`, `export_format`, `template_folder`
 

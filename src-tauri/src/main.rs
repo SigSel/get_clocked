@@ -122,6 +122,20 @@ fn list_templates(folder: String) -> Result<Vec<Template>, String> {
 }
 
 #[tauri::command]
+fn delete_template(folder: String, name: String) -> Result<(), String> {
+    let sanitized: String = name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == ' ')
+        .collect::<String>()
+        .replace(' ', "_");
+    let path = std::path::Path::new(&folder).join(format!("{}.json", sanitized));
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
 async fn pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
     let folder = app.dialog().file().blocking_pick_folder();
@@ -431,6 +445,7 @@ fn main() {
             export_monthly,
             save_template,
             list_templates,
+            delete_template,
             get_categories,
             save_categories,
             pick_categories_file,

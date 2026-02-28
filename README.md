@@ -17,7 +17,7 @@ A cross-platform desktop time-tracking app built with Tauri 2 and a Rust/WASM fr
 - Copy workday data to clipboard as TSV
 - Export to CSV or XLSX — files named `workday_{date}.csv` / `workday_{date}.xlsx`
 - Optionally append entries to a running monthly overview sheet (`monthly_{YYYY-MM}.csv` / `.xlsx`)
-- Create reusable category templates via the Template Maker page
+- Create, edit, and delete reusable category templates via the Template Maker page
 - Template selector in the draft entry form pre-populates categories from a saved template
 - Define reusable category names and allowed values via the Category Manager page
 - Import category definitions from existing CSV/XLSX files

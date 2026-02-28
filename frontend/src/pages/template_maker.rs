@@ -8,7 +8,7 @@ use futures_signals::signal_vec::SignalVecExt;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 
-use crate::app::{AppPage, AppState, DraftCategory, TemplateMakerState};
+use crate::app::{AppPage, AppState, DraftCategory, TemplateMakerState, TemplateData};
 
 #[derive(serde::Serialize)]
 struct SaveTemplateArgs {
@@ -17,8 +17,42 @@ struct SaveTemplateArgs {
     categories: Vec<(String, String)>,
 }
 
+#[derive(serde::Serialize)]
+struct DeleteTemplateArgs {
+    folder: String,
+    name: String,
+}
+
+async fn invoke_delete_template(folder: String, name: String) {
+    if let Ok(args) = tauri_wasm::args(&DeleteTemplateArgs { folder, name }) {
+        let _ = tauri_wasm::invoke("delete_template").with_args(args).await;
+    }
+}
+
+async fn load_templates(tm: Arc<TemplateMakerState>, folder: String) {
+    if folder.is_empty() {
+        return;
+    }
+    #[derive(serde::Serialize)]
+    struct ListArgs {
+        folder: String,
+    }
+    if let Ok(args) = tauri_wasm::args(&ListArgs { folder }) {
+        if let Ok(js_val) = tauri_wasm::invoke("list_templates").with_args(args).await {
+            if let Ok(list) = serde_wasm_bindgen::from_value::<Vec<TemplateData>>(js_val) {
+                tm.templates.lock_mut().replace_cloned(list);
+            }
+        }
+    }
+}
+
 pub fn render(state: Arc<AppState>) -> Dom {
     let tm = state.template_maker.clone();
+    {
+        let tm = tm.clone();
+        let folder = state.template_folder.lock_ref().clone();
+        spawn_local(async move { load_templates(tm, folder).await; });
+    }
     html!("div", {
         .dwclass!("w-full h-screen bg-gray-900 flex flex-col")
         .style("color", "white")
@@ -49,13 +83,15 @@ pub fn render(state: Arc<AppState>) -> Dom {
                         .text(m)
                     }))
                 }))
-                .child(render_save_button(state.clone()))
+                .child(render_action_buttons(state.clone()))
+                .child(render_templates_list(state.clone()))
             }))
         }))
     })
 }
 
 fn render_header(state: Arc<AppState>) -> Dom {
+    let tm = state.template_maker.clone();
     html!("div", {
         .dwclass!("flex items-center gap-4 p-4")
         .style("border-bottom", "1px solid #374151")
@@ -67,12 +103,13 @@ fn render_header(state: Arc<AppState>) -> Dom {
             .style("font-size", "17px")
             .text("← Back")
             .event(clone!(state => move |_: events::Click| {
+                state.template_maker.reset();
                 state.page.set(AppPage::Home);
             }))
         }))
-        .child(html!("h2", {
-            .dwclass!("text-xl font-semibold")
-            .text("Create Template")
+        .child_signal(tm.editing_original_name.signal_ref(|name| {
+            let title = if name.is_some() { "Edit Template" } else { "Create Template" };
+            Some(html!("h2", { .dwclass!("text-xl font-semibold").text(title) }))
         }))
     })
 }
@@ -219,7 +256,38 @@ fn render_add_category_button(tm: Arc<TemplateMakerState>) -> Dom {
     })
 }
 
-fn render_save_button(state: Arc<AppState>) -> Dom {
+fn render_action_buttons(state: Arc<AppState>) -> Dom {
+    html!("div", {
+        .dwclass!("flex gap-4 items-center")
+        .child_signal(state.template_maker.editing_original_name.signal_ref(
+            clone!(state => move |name| Some(render_save_button(state.clone(), name.is_some())))
+        ))
+        .child_signal(state.template_maker.editing_original_name.signal_ref(
+            clone!(state => move |name| {
+                if name.is_some() {
+                    Some(html!("button", {
+                        .style("background", "none")
+                        .style("color", "#9ca3af")
+                        .style("border", "1px solid #6b7280")
+                        .style("border-radius", "4px")
+                        .style("padding", "10px 26px")
+                        .style("cursor", "pointer")
+                        .style("font-size", "16px")
+                        .text("Cancel")
+                        .event(clone!(state => move |_: events::Click| {
+                            state.template_maker.reset();
+                        }))
+                    }))
+                } else {
+                    None
+                }
+            })
+        ))
+    })
+}
+
+fn render_save_button(state: Arc<AppState>, is_editing: bool) -> Dom {
+    let label = if is_editing { "Update Template" } else { "Save Template" };
     html!("button", {
         .dwclass!("cursor-pointer font-semibold")
         .style("background", "#16a34a")
@@ -230,7 +298,7 @@ fn render_save_button(state: Arc<AppState>) -> Dom {
         .style("align-self", "flex-start")
         .style("margin-top", "8px")
         .style("font-size", "16px")
-        .text("Save Template")
+        .text(label)
         .event(clone!(state => move |_: events::Click| {
             let state = state.clone();
             spawn_local(async move {
@@ -250,7 +318,14 @@ fn render_save_button(state: Arc<AppState>) -> Dom {
                     .filter(|(k, _)| !k.is_empty())
                     .collect::<Vec<_>>();
                 tm.error_msg.set(None);
-                let raw_args = SaveTemplateArgs { folder, name, categories };
+
+                // If editing, delete the old file first (handles renames)
+                let original_name = tm.editing_original_name.lock_ref().clone();
+                if let Some(orig) = original_name {
+                    invoke_delete_template(folder.clone(), orig).await;
+                }
+
+                let raw_args = SaveTemplateArgs { folder: folder.clone(), name, categories };
                 let args = match tauri_wasm::args(&raw_args) {
                     Err(e) => {
                         tm.error_msg.set(Some(format!("Error: {:?}", e)));
@@ -261,6 +336,7 @@ fn render_save_button(state: Arc<AppState>) -> Dom {
                 match tauri_wasm::invoke("save_template").with_args(args).await {
                     Ok(_) => {
                         tm.reset();
+                        load_templates(tm.clone(), folder.clone()).await;
                         tm.status_msg.set(Some("Template saved!".to_string()));
                     }
                     Err(e) => {
@@ -268,6 +344,89 @@ fn render_save_button(state: Arc<AppState>) -> Dom {
                     }
                 }
             });
+        }))
+    })
+}
+
+fn render_templates_list(state: Arc<AppState>) -> Dom {
+    let tm = state.template_maker.clone();
+    html!("div", {
+        .dwclass!("flex flex-col gap-2")
+        .style("margin-top", "16px")
+        .child(html!("h3", {
+            .dwclass!("font-semibold")
+            .style("color", "#d1d5db")
+            .style("font-size", "16px")
+            .text("Saved Templates")
+        }))
+        .children_signal_vec(tm.templates.signal_vec_cloned()
+            .map(clone!(state => move |t| render_template_row(state.clone(), t))))
+    })
+}
+
+fn render_template_row(state: Arc<AppState>, template: TemplateData) -> Dom {
+    let tm = state.template_maker.clone();
+    html!("div", {
+        .dwclass!("flex items-center gap-4")
+        .style("padding", "8px 12px")
+        .style("background", "#1f2937")
+        .style("border-radius", "4px")
+        .child(html!("span", {
+            .style("flex", "1")
+            .style("color", "#e5e7eb")
+            .style("font-size", "15px")
+            .text(&template.name)
+        }))
+        .child(html!("button", {
+            .style("background", "none")
+            .style("color", "#60a5fa")
+            .style("border", "1px solid #60a5fa")
+            .style("border-radius", "4px")
+            .style("padding", "4px 12px")
+            .style("cursor", "pointer")
+            .style("font-size", "14px")
+            .text("Edit")
+            .event(clone!(tm, template => move |_: events::Click| {
+                tm.name.set(template.name.clone());
+                {
+                    let mut cats = tm.categories.lock_mut();
+                    cats.clear();
+                    for (k, v) in &template.categories {
+                        let cat = DraftCategory::new();
+                        cat.key.set(k.clone());
+                        cat.value.set(v.clone());
+                        cats.push_cloned(cat);
+                    }
+                }
+                tm.error_msg.set(None);
+                tm.status_msg.set(None);
+                tm.editing_original_name.set(Some(template.name.clone()));
+            }))
+        }))
+        .child(html!("button", {
+            .style("background", "none")
+            .style("color", "#f87171")
+            .style("border", "1px solid #f87171")
+            .style("border-radius", "4px")
+            .style("padding", "4px 12px")
+            .style("cursor", "pointer")
+            .style("font-size", "14px")
+            .text("Delete")
+            .event(clone!(state, template => move |_: events::Click| {
+                let state = state.clone();
+                let template_name = template.name.clone();
+                spawn_local(async move {
+                    let tm = &state.template_maker;
+                    let folder = state.template_folder.lock_ref().clone();
+                    invoke_delete_template(folder.clone(), template_name.clone()).await;
+                    load_templates(tm.clone(), folder).await;
+                    let editing = tm.editing_original_name.lock_ref().clone();
+                    if editing.as_deref() == Some(template_name.as_str()) {
+                        tm.reset();
+                    }
+                    tm.status_msg.set(Some(format!("'{}' deleted.", template_name)));
+                });
+            }))
         }))
     })
 }
