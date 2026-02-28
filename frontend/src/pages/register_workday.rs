@@ -17,14 +17,17 @@ struct ExportArgs {
     folder: String,
     format: String,
     date: String,
+    date_format: String,
     entries: Vec<WorkEntry>,
 }
 
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct MonthlyArgs {
     folder: String,
     format: String,
     date: String,
+    date_format: String,
     entries: Vec<WorkEntry>,
 }
 
@@ -494,14 +497,15 @@ fn render_action_bar(state: Arc<AppState>) -> Dom {
                 .style("cursor", "pointer")
                 .style("font-size", "16px")
                 .text("Copy to Clipboard")
-                .event(clone!(wd => move |_: events::Click| {
+                .event(clone!(state, wd => move |_: events::Click| {
                     let entries = wd.entries.lock_ref().to_vec();
                     if entries.is_empty() {
                         wd.status_msg.set(Some("No entries to copy.".to_string()));
                         return;
                     }
-                    let date = wd.date.lock_ref().clone();
-                    let text = format_as_tsv(&entries, &date);
+                    let iso_date = wd.date.lock_ref().clone();
+                    let display_date = state.date_format.lock_ref().format_date(&iso_date);
+                    let text = format_as_tsv(&entries, &display_date);
                     copy_to_clipboard(text, wd.clone());
                 }))
             }))
@@ -618,11 +622,13 @@ async fn do_export(state: Arc<AppState>) {
     };
 
     let format = state.export_format.lock_ref().as_str().to_string();
+    let date_format = state.date_format.lock_ref().as_str().to_string();
     let date = wd.date.lock_ref().clone();
     let raw_args = ExportArgs {
         folder: folder.clone(),
         format: format.clone(),
         date: date.clone(),
+        date_format: date_format.clone(),
         entries: entries.clone(),
     };
     let args = match tauri_wasm::args(&raw_args) {
@@ -636,7 +642,7 @@ async fn do_export(state: Arc<AppState>) {
         Ok(_) => {
             wd.status_msg.set(Some("Exported!".to_string()));
             if wd.include_monthly.get() {
-                let monthly_args = MonthlyArgs { folder, format, date, entries };
+                let monthly_args = MonthlyArgs { folder, format, date, date_format, entries };
                 if let Ok(args) = tauri_wasm::args(&monthly_args) {
                     let _ = tauri_wasm::invoke("export_monthly").with_args(args).await;
                 };

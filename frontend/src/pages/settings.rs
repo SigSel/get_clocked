@@ -6,7 +6,7 @@ use dwind_macros::dwclass;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlSelectElement;
 
-use crate::app::{AppPage, AppState, ExportFormat};
+use crate::app::{AppPage, AppState, DateFormat, ExportFormat};
 
 pub fn render(state: Arc<AppState>) -> Dom {
     html!("div", {
@@ -53,6 +53,7 @@ fn render_content(state: Arc<AppState>) -> Dom {
             .child(render_folder_section(state.clone()))
             .child(render_template_folder_section(state.clone()))
             .child(render_format_section(state.clone()))
+            .child(render_date_format_section(state.clone()))
             .child(render_save_button(state.clone()))
         }))
     })
@@ -221,6 +222,84 @@ fn render_format_section(state: Arc<AppState>) -> Dom {
                 .with_node!(element => {
                     .event(clone!(state => move |_: events::Change| {
                         state.export_format.set(ExportFormat::from_str(&element.value()));
+                    }))
+                })
+            })
+        )
+    })
+}
+
+fn render_date_format_section(state: Arc<AppState>) -> Dom {
+    let current_format = state.date_format.lock_ref().clone();
+
+    html!("div", {
+        .dwclass!("flex flex-col gap-2")
+        .child(
+            html!("label", {
+                .dwclass!("font-medium")
+                .style("color", "#d1d5db")
+                .style("font-size", "16px")
+                .text("Date Format")
+            })
+        )
+        .child(
+            html!("select" => HtmlSelectElement, {
+                .style("background", "#374151")
+                .style("color", "white")
+                .style("border", "1px solid #4b5563")
+                .style("border-radius", "4px")
+                .style("padding", "8px 16px")
+                .style("font-size", "1rem")
+                .style("width", "260px")
+                .children(&mut [
+                    html!("option", {
+                        .attr("value", "YYYY-MM-DD")
+                        .text("YYYY-MM-DD")
+                        .apply(|b| {
+                            if current_format == DateFormat::YyyyMmDd {
+                                b.attr("selected", "")
+                            } else {
+                                b
+                            }
+                        })
+                    }),
+                    html!("option", {
+                        .attr("value", "YYYY.MM.DD")
+                        .text("YYYY.MM.DD")
+                        .apply(|b| {
+                            if current_format == DateFormat::YyyyDotMmDotDd {
+                                b.attr("selected", "")
+                            } else {
+                                b
+                            }
+                        })
+                    }),
+                    html!("option", {
+                        .attr("value", "DD-MM-YYYY")
+                        .text("DD-MM-YYYY")
+                        .apply(|b| {
+                            if current_format == DateFormat::DdMmYyyy {
+                                b.attr("selected", "")
+                            } else {
+                                b
+                            }
+                        })
+                    }),
+                    html!("option", {
+                        .attr("value", "DD.MM.YYYY")
+                        .text("DD.MM.YYYY")
+                        .apply(|b| {
+                            if current_format == DateFormat::DdDotMmDotYyyy {
+                                b.attr("selected", "")
+                            } else {
+                                b
+                            }
+                        })
+                    }),
+                ])
+                .with_node!(element => {
+                    .event(clone!(state => move |_: events::Change| {
+                        state.date_format.set(DateFormat::from_str(&element.value()));
                     }))
                 })
             })

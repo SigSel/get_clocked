@@ -7,7 +7,11 @@ struct Settings {
     export_format: String,
     #[serde(default)]
     template_folder: String,
+    #[serde(default = "default_date_format")]
+    date_format: String,
 }
+
+fn default_date_format() -> String { "YYYY-MM-DD".to_string() }
 
 impl Default for Settings {
     fn default() -> Self {
@@ -15,6 +19,7 @@ impl Default for Settings {
             export_folder: String::new(),
             export_format: "csv".to_string(),
             template_folder: String::new(),
+            date_format: default_date_format(),
         }
     }
 }
@@ -42,14 +47,27 @@ fn save_settings(
     export_folder: String,
     export_format: String,
     template_folder: String,
+    date_format: String,
 ) -> Result<(), String> {
     let path = settings_path(&app)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let settings = Settings { export_folder, export_format, template_folder };
+    let settings = Settings { export_folder, export_format, template_folder, date_format };
     let content = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+fn format_date_for_export(iso_date: &str, fmt: &str) -> String {
+    let parts: Vec<&str> = iso_date.split('-').collect();
+    if parts.len() != 3 { return iso_date.to_string(); }
+    let (y, m, d) = (parts[0], parts[1], parts[2]);
+    match fmt {
+        "DD.MM.YYYY" => format!("{}.{}.{}", d, m, y),
+        "DD-MM-YYYY" => format!("{}-{}-{}", d, m, y),
+        "YYYY.MM.DD" => format!("{}.{}.{}", y, m, d),
+        _            => format!("{}-{}-{}", y, m, d),
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -224,6 +242,7 @@ fn export_workday(
     folder: String,
     format: String,
     date: String,
+    date_format: String,
     entries: Vec<WorkEntry>,
 ) -> Result<(), String> {
     let dir = std::path::Path::new(&folder);
@@ -232,10 +251,11 @@ fn export_workday(
     }
     let ext = if format == "xlsx" { "xlsx" } else { "csv" };
     let path = dir.join(format!("workday_{}.{}", date, ext));
+    let display_date = format_date_for_export(&date, &date_format);
     if format == "xlsx" {
-        export_xlsx(&path, &entries, &date)
+        export_xlsx(&path, &entries, &display_date)
     } else {
-        export_csv(&path, &entries, &date)
+        export_csv(&path, &entries, &display_date)
     }
 }
 
@@ -298,20 +318,21 @@ fn export_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Res
 }
 
 #[tauri::command]
-fn export_monthly(folder: String, format: String, date: String, entries: Vec<WorkEntry>) -> Result<(), String> {
+fn export_monthly(folder: String, format: String, date: String, date_format: String, entries: Vec<WorkEntry>) -> Result<(), String> {
     let folder_path = std::path::Path::new(&folder);
     if !folder_path.exists() {
         return Err(format!("Export folder does not exist: {}", folder));
     }
     let month = &date[..7]; // "YYYY-MM" from "YYYY-MM-DD"
+    let display_date = format_date_for_export(&date, &date_format);
     match format.as_str() {
         "xlsx" => {
             let path = folder_path.join(format!("monthly_{}.xlsx", month));
-            export_monthly_xlsx(&path, &entries, &date)
+            export_monthly_xlsx(&path, &entries, &display_date)
         }
         _ => {
             let path = folder_path.join(format!("monthly_{}.csv", month));
-            export_monthly_csv(&path, &entries, &date)
+            export_monthly_csv(&path, &entries, &display_date)
         }
     }
 }
