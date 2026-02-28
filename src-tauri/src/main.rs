@@ -128,6 +128,77 @@ async fn pick_folder(app: tauri::AppHandle) -> Result<Option<String>, String> {
     Ok(folder.map(|f| f.to_string()))
 }
 
+#[tauri::command]
+async fn pick_categories_file(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let file = app
+        .dialog()
+        .file()
+        .add_filter("Spreadsheets", &["csv", "xlsx"])
+        .blocking_pick_file();
+    Ok(file.map(|f| f.to_string()))
+}
+
+#[tauri::command]
+fn import_categories(path: String) -> Result<Vec<CategoryDefinition>, String> {
+    let p = std::path::Path::new(&path);
+    match p.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()).as_deref() {
+        Some("xlsx") => import_categories_xlsx(p),
+        _ => import_categories_csv(p),
+    }
+}
+
+fn import_categories_csv(path: &std::path::Path) -> Result<Vec<CategoryDefinition>, String> {
+    let mut reader = csv::Reader::from_path(path).map_err(|e| e.to_string())?;
+    let headers: Vec<String> = reader
+        .headers().map_err(|e| e.to_string())?
+        .iter().map(|h| h.to_string()).collect();
+    let mut columns: Vec<Vec<String>> = vec![vec![]; headers.len()];
+    for record in reader.records() {
+        let record = record.map_err(|e| e.to_string())?;
+        for (i, value) in record.iter().enumerate() {
+            if i < columns.len() && !value.is_empty() {
+                let v = value.to_string();
+                if !columns[i].contains(&v) { columns[i].push(v); }
+            }
+        }
+    }
+    Ok(headers.into_iter().zip(columns)
+        .filter(|(name, _)| !name.is_empty())
+        .map(|(name, values)| CategoryDefinition { name, values })
+        .collect())
+}
+
+fn import_categories_xlsx(path: &std::path::Path) -> Result<Vec<CategoryDefinition>, String> {
+    use calamine::{open_workbook, Data, Reader, Xlsx};
+    let mut wb: Xlsx<_> = open_workbook(path).map_err(|e: calamine::XlsxError| e.to_string())?;
+    let range = wb.worksheet_range_at(0)
+        .ok_or("No worksheets in file")?
+        .map_err(|e: calamine::XlsxError| e.to_string())?;
+    let mut rows = range.rows();
+    let headers: Vec<String> = rows.next().unwrap_or(&[]).iter().map(|c| match c {
+        Data::String(s) => s.clone(),
+        Data::Empty => String::new(),
+        other => other.to_string(),
+    }).collect();
+    let mut columns: Vec<Vec<String>> = vec![vec![]; headers.len()];
+    for row in rows {
+        for (i, cell) in row.iter().enumerate() {
+            if i >= columns.len() { continue; }
+            let v = match cell {
+                Data::String(s) => s.clone(),
+                Data::Empty => String::new(),
+                other => other.to_string(),
+            };
+            if !v.is_empty() && !columns[i].contains(&v) { columns[i].push(v); }
+        }
+    }
+    Ok(headers.into_iter().zip(columns)
+        .filter(|(name, _)| !name.is_empty())
+        .map(|(name, values)| CategoryDefinition { name, values })
+        .collect())
+}
+
 #[derive(serde::Deserialize)]
 struct WorkEntry {
     hours: f64,
@@ -361,7 +432,9 @@ fn main() {
             save_template,
             list_templates,
             get_categories,
-            save_categories
+            save_categories,
+            pick_categories_file,
+            import_categories
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

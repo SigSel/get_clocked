@@ -15,6 +15,11 @@ struct SaveCategoriesArgs {
     categories: Vec<CategoryDefinition>,
 }
 
+#[derive(serde::Serialize)]
+struct ImportCategoriesArgs {
+    path: String,
+}
+
 pub fn render(state: Arc<AppState>) -> Dom {
     let cm = state.category_manager.clone();
 
@@ -71,6 +76,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
                         cm.definitions.lock_mut().push_cloned(DraftCategoryDefinition::new());
                     }))
                 }))
+                .child(render_import_button(state.clone()))
                 .child(render_save_button(state.clone()))
             }))
         }))
@@ -197,6 +203,71 @@ fn render_value_row(def: Arc<DraftCategoryDefinition>, val: Arc<Mutable<String>>
                 let ptr = Arc::as_ptr(&val);
                 def.values.lock_mut().retain(|v| Arc::as_ptr(v) != ptr);
             }))
+        }))
+    })
+}
+
+fn render_import_button(state: Arc<AppState>) -> Dom {
+    html!("button", {
+        .style("background", "none")
+        .style("color", "#a78bfa")
+        .style("border", "1px solid #a78bfa")
+        .style("border-radius", "4px")
+        .style("padding", "6px 14px")
+        .style("cursor", "pointer")
+        .style("font-size", "15px")
+        .style("align-self", "flex-start")
+        .text("Import from CSV/XLSX")
+        .event(clone!(state => move |_: events::Click| {
+            let state = state.clone();
+            spawn_local(async move {
+                let cm = &state.category_manager;
+                // 1. Pick file
+                let js_val = match tauri_wasm::invoke("pick_categories_file").await {
+                    Ok(v) => v,
+                    Err(e) => { cm.error_msg.set(Some(format!("Error: {:?}", e))); return; }
+                };
+                let path_opt: Option<String> = match serde_wasm_bindgen::from_value(js_val) {
+                    Ok(v) => v,
+                    Err(e) => { cm.error_msg.set(Some(format!("Error: {:?}", e))); return; }
+                };
+                let path = match path_opt {
+                    Some(p) => p,
+                    None => return, // user cancelled
+                };
+                // 2. Import
+                let raw_args = ImportCategoriesArgs { path };
+                let args = match tauri_wasm::args(&raw_args) {
+                    Ok(a) => a,
+                    Err(e) => { cm.error_msg.set(Some(format!("Error: {:?}", e))); return; }
+                };
+                let js_val = match tauri_wasm::invoke("import_categories").with_args(args).await {
+                    Ok(v) => v,
+                    Err(e) => { cm.error_msg.set(Some(format!("Import failed: {:?}", e))); return; }
+                };
+                let imported: Vec<CategoryDefinition> = match serde_wasm_bindgen::from_value(js_val) {
+                    Ok(v) => v,
+                    Err(e) => { cm.error_msg.set(Some(format!("Error: {:?}", e))); return; }
+                };
+                // 3. Merge
+                let mut lock = cm.definitions.lock_mut();
+                for imported_def in &imported {
+                    let existing_idx = lock.iter().position(|d| *d.name.lock_ref() == imported_def.name);
+                    if let Some(idx) = existing_idx {
+                        let existing = &lock[idx];
+                        let mut vals_lock = existing.values.lock_mut();
+                        for v in &imported_def.values {
+                            if !vals_lock.iter().any(|ev| *ev.lock_ref() == *v) {
+                                vals_lock.push_cloned(Arc::new(Mutable::new(v.clone())));
+                            }
+                        }
+                    } else {
+                        lock.push_cloned(DraftCategoryDefinition::from_definition(imported_def));
+                    }
+                }
+                cm.error_msg.set(None);
+                cm.status_msg.set(Some(format!("Imported {} categories.", imported.len())));
+            });
         }))
     })
 }
