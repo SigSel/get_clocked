@@ -58,6 +58,34 @@ struct Template {
     categories: Vec<(String, String)>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+struct CategoryDefinition {
+    name: String,
+    values: Vec<String>,
+}
+
+fn categories_path(app: &tauri::AppHandle) -> PathBuf {
+    app.path().app_config_dir().unwrap().join("category_definitions.json")
+}
+
+#[tauri::command]
+fn get_categories(app: tauri::AppHandle) -> Vec<CategoryDefinition> {
+    let path = categories_path(&app);
+    if !path.exists() { return vec![]; }
+    let data = std::fs::read_to_string(&path).unwrap_or_default();
+    serde_json::from_str(&data).unwrap_or_default()
+}
+
+#[tauri::command]
+fn save_categories(app: tauri::AppHandle, categories: Vec<CategoryDefinition>) -> Result<(), String> {
+    let path = categories_path(&app);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let content = serde_json::to_string_pretty(&categories).map_err(|e| e.to_string())?;
+    std::fs::write(&path, content).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn save_template(folder: String, name: String, categories: Vec<(String, String)>) -> Result<(), String> {
     std::fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
@@ -331,7 +359,9 @@ fn main() {
             export_workday,
             export_monthly,
             save_template,
-            list_templates
+            list_templates,
+            get_categories,
+            save_categories
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

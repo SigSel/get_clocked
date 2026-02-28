@@ -53,6 +53,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
     html!("div", {
         .dwclass!("relative w-full h-screen bg-gray-900 flex flex-col")
         .style("color", "white")
+        .child(render_category_keys_datalist(state.clone()))
         .event(|_: events::MouseDown| {
             if let Some(window) = web_sys::window() {
                 if let Some(doc) = window.document() {
@@ -78,7 +79,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
                 .child(render_date_section(wd.clone()))
                 .child(render_entries_list(wd.clone()))
                 .child(render_add_entry_button(wd.clone()))
-                .child(render_draft_form(wd.clone(), templates))
+                .child(render_draft_form(state.clone(), wd.clone(), templates))
                 .child(render_action_bar(state.clone()))
             }))
         }))
@@ -198,7 +199,7 @@ fn render_add_entry_button(wd: Arc<WorkdayState>) -> Dom {
     })
 }
 
-fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateData>>) -> Dom {
+fn render_draft_form(state: Arc<AppState>, wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateData>>) -> Dom {
     html!("div", {
         .visible_signal(wd.draft_visible.signal())
         .dwclass!("flex flex-col gap-4")
@@ -292,8 +293,8 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
         // Category rows
         .child(html!("div", {
             .dwclass!("flex flex-col gap-2")
-            .children_signal_vec(wd.draft.categories.signal_vec_cloned().map(clone!(wd => move |cat| {
-                render_category_row(wd.clone(), cat)
+            .children_signal_vec(wd.draft.categories.signal_vec_cloned().map(clone!(wd, state => move |cat| {
+                render_category_row(wd.clone(), state.clone(), cat)
             })))
         }))
 
@@ -345,12 +346,32 @@ fn render_draft_form(wd: Arc<WorkdayState>, templates: Arc<MutableVec<TemplateDa
     })
 }
 
-fn render_category_row(wd: Arc<WorkdayState>, cat: Arc<DraftCategory>) -> Dom {
+fn render_category_row(wd: Arc<WorkdayState>, state: Arc<AppState>, cat: Arc<DraftCategory>) -> Dom {
+    let val_list_id = format!("cat-val-{:x}", Arc::as_ptr(&cat) as usize);
+    let value_options = futures_signals::map_ref! {
+        let key = cat.key.signal_cloned(),
+        let defs = state.category_definitions.signal_cloned()
+        => {
+            defs.iter().find(|d| d.name == *key)
+                .map(|d| d.values.clone()).unwrap_or_default()
+        }
+    };
     html!("div", {
         .dwclass!("flex items-center gap-2")
+        .child(html!("datalist", {
+            .attr("id", &val_list_id)
+            .children_signal_vec(
+                value_options
+                    .map(|vals| vals.into_iter()
+                        .map(|v| html!("option", { .attr("value", &v) }))
+                        .collect::<Vec<_>>())
+                    .to_signal_vec()
+            )
+        }))
         .child(html!("input" => HtmlInputElement, {
             .attr("type", "text")
             .attr("placeholder", "Category")
+            .attr("list", "cat-keys-datalist")
             .style("background", "#374151")
             .style("color", "white")
             .style("border", "1px solid #4b5563")
@@ -368,6 +389,7 @@ fn render_category_row(wd: Arc<WorkdayState>, cat: Arc<DraftCategory>) -> Dom {
         .child(html!("input" => HtmlInputElement, {
             .attr("type", "text")
             .attr("placeholder", "Value")
+            .attr("list", &val_list_id)
             .style("background", "#374151")
             .style("color", "white")
             .style("border", "1px solid #4b5563")
@@ -394,6 +416,19 @@ fn render_category_row(wd: Arc<WorkdayState>, cat: Arc<DraftCategory>) -> Dom {
                 wd.draft.categories.lock_mut().retain(|c| Arc::as_ptr(c) != ptr);
             }))
         }))
+    })
+}
+
+fn render_category_keys_datalist(state: Arc<AppState>) -> Dom {
+    html!("datalist", {
+        .attr("id", "cat-keys-datalist")
+        .children_signal_vec(
+            state.category_definitions.signal_cloned()
+                .map(|defs| defs.into_iter()
+                    .map(|d| html!("option", { .attr("value", &d.name) }))
+                    .collect::<Vec<_>>())
+                .to_signal_vec()
+        )
     })
 }
 

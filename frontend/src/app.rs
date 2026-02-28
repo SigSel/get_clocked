@@ -12,6 +12,7 @@ pub enum AppPage {
     Settings,
     RegisterWorkday,
     TemplateMaker,
+    CategoryManager,
 }
 
 #[derive(Clone, PartialEq)]
@@ -79,6 +80,55 @@ pub struct WorkEntry {
 pub struct TemplateData {
     pub name: String,
     pub categories: Vec<(String, String)>,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct CategoryDefinition {
+    pub name: String,
+    pub values: Vec<String>,
+}
+
+pub struct DraftCategoryDefinition {
+    pub name: Mutable<String>,
+    pub values: MutableVec<Arc<Mutable<String>>>,
+}
+
+impl DraftCategoryDefinition {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            name: Mutable::new(String::new()),
+            values: MutableVec::new(),
+        })
+    }
+
+    pub fn from_definition(def: &CategoryDefinition) -> Arc<Self> {
+        let d = Arc::new(Self {
+            name: Mutable::new(def.name.clone()),
+            values: MutableVec::new(),
+        });
+        let mut lock = d.values.lock_mut();
+        for v in &def.values {
+            lock.push_cloned(Arc::new(Mutable::new(v.clone())));
+        }
+        drop(lock);
+        d
+    }
+}
+
+pub struct CategoryManagerState {
+    pub definitions: MutableVec<Arc<DraftCategoryDefinition>>,
+    pub status_msg: Mutable<Option<String>>,
+    pub error_msg: Mutable<Option<String>>,
+}
+
+impl CategoryManagerState {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            definitions: MutableVec::new(),
+            status_msg: Mutable::new(None),
+            error_msg: Mutable::new(None),
+        })
+    }
 }
 
 pub struct TemplateMakerState {
@@ -155,6 +205,8 @@ pub struct AppState {
     pub template_folder: Mutable<String>,
     pub workday: Arc<WorkdayState>,
     pub template_maker: Arc<TemplateMakerState>,
+    pub category_definitions: Mutable<Vec<CategoryDefinition>>,
+    pub category_manager: Arc<CategoryManagerState>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]
@@ -184,6 +236,13 @@ impl AppState {
         .await
         .unwrap_or_default();
 
+        let categories: Vec<CategoryDefinition> = async {
+            let js_val = tauri_wasm::invoke("get_categories").await.map_err(|e| e.to_string())?;
+            serde_wasm_bindgen::from_value::<Vec<CategoryDefinition>>(js_val).map_err(|e| e.to_string())
+        }
+        .await
+        .unwrap_or_default();
+
         AppState {
             page: Mutable::new(AppPage::Home),
             export_folder: Mutable::new(settings.export_folder),
@@ -191,6 +250,8 @@ impl AppState {
             template_folder: Mutable::new(settings.template_folder),
             workday: Arc::new(WorkdayState::new()),
             template_maker: TemplateMakerState::new(),
+            category_definitions: Mutable::new(categories),
+            category_manager: CategoryManagerState::new(),
         }
     }
 
@@ -217,6 +278,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
                 AppPage::Settings => pages::settings::render(state.clone()),
                 AppPage::RegisterWorkday => pages::register_workday::render(state.clone()),
                 AppPage::TemplateMaker => pages::template_maker::render(state.clone()),
+                AppPage::CategoryManager => pages::category_manager::render(state.clone()),
             })
         })))
     })

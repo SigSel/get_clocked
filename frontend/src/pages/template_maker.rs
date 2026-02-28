@@ -3,6 +3,7 @@ use std::sync::Arc;
 use dominator::{clone, events, html, with_node, Dom};
 use dwind::prelude::*;
 use dwind_macros::dwclass;
+use futures_signals::signal::SignalExt;
 use futures_signals::signal_vec::SignalVecExt;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
@@ -21,6 +22,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
     html!("div", {
         .dwclass!("w-full h-screen bg-gray-900 flex flex-col")
         .style("color", "white")
+        .child(render_category_keys_datalist(state.clone()))
         .child(render_header(state.clone()))
         .child(html!("div", {
             .dwclass!("flex flex-col items-center justify-center")
@@ -31,7 +33,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
                 .dwclass!("flex flex-col gap-4")
                 .style("width", "640px")
                 .child(render_name_input(tm.clone()))
-                .child(render_categories(tm.clone()))
+                .child(render_categories(tm.clone(), state.clone()))
                 .child(render_add_category_button(tm.clone()))
                 .child_signal(tm.error_msg.signal_ref(|msg| {
                     msg.as_ref().map(|m| html!("span", {
@@ -105,21 +107,41 @@ fn render_name_input(tm: Arc<TemplateMakerState>) -> Dom {
     })
 }
 
-fn render_categories(tm: Arc<TemplateMakerState>) -> Dom {
+fn render_categories(tm: Arc<TemplateMakerState>, state: Arc<AppState>) -> Dom {
     html!("div", {
         .dwclass!("flex flex-col gap-2")
-        .children_signal_vec(tm.categories.signal_vec_cloned().map(clone!(tm => move |cat| {
-            render_category_row(tm.clone(), cat)
+        .children_signal_vec(tm.categories.signal_vec_cloned().map(clone!(tm, state => move |cat| {
+            render_category_row(tm.clone(), state.clone(), cat)
         })))
     })
 }
 
-fn render_category_row(tm: Arc<TemplateMakerState>, cat: Arc<DraftCategory>) -> Dom {
+fn render_category_row(tm: Arc<TemplateMakerState>, state: Arc<AppState>, cat: Arc<DraftCategory>) -> Dom {
+    let val_list_id = format!("cat-val-{:x}", Arc::as_ptr(&cat) as usize);
+    let value_options = futures_signals::map_ref! {
+        let key = cat.key.signal_cloned(),
+        let defs = state.category_definitions.signal_cloned()
+        => {
+            defs.iter().find(|d| d.name == *key)
+                .map(|d| d.values.clone()).unwrap_or_default()
+        }
+    };
     html!("div", {
         .dwclass!("flex items-center gap-2")
+        .child(html!("datalist", {
+            .attr("id", &val_list_id)
+            .children_signal_vec(
+                value_options
+                    .map(|vals| vals.into_iter()
+                        .map(|v| html!("option", { .attr("value", &v) }))
+                        .collect::<Vec<_>>())
+                    .to_signal_vec()
+            )
+        }))
         .child(html!("input" => HtmlInputElement, {
             .attr("type", "text")
             .attr("placeholder", "Category")
+            .attr("list", "cat-keys-datalist")
             .style("background", "#374151")
             .style("color", "white")
             .style("border", "1px solid #4b5563")
@@ -137,6 +159,7 @@ fn render_category_row(tm: Arc<TemplateMakerState>, cat: Arc<DraftCategory>) -> 
         .child(html!("input" => HtmlInputElement, {
             .attr("type", "text")
             .attr("placeholder", "Value")
+            .attr("list", &val_list_id)
             .style("background", "#374151")
             .style("color", "white")
             .style("border", "1px solid #4b5563")
@@ -163,6 +186,19 @@ fn render_category_row(tm: Arc<TemplateMakerState>, cat: Arc<DraftCategory>) -> 
                 tm.categories.lock_mut().retain(|c| Arc::as_ptr(c) != ptr);
             }))
         }))
+    })
+}
+
+fn render_category_keys_datalist(state: Arc<AppState>) -> Dom {
+    html!("datalist", {
+        .attr("id", "cat-keys-datalist")
+        .children_signal_vec(
+            state.category_definitions.signal_cloned()
+                .map(|defs| defs.into_iter()
+                    .map(|d| html!("option", { .attr("value", &d.name) }))
+                    .collect::<Vec<_>>())
+                .to_signal_vec()
+        )
     })
 }
 

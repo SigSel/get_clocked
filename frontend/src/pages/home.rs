@@ -59,6 +59,19 @@ pub fn render(state: Arc<AppState>) -> Dom {
                         state.page.set(AppPage::TemplateMaker);
                     }))
                 }))
+                .child(html!("button", {
+                    .dwclass!("cursor-pointer font-medium")
+                    .style("background", "none")
+                    .style("color", "#93c5fd")
+                    .style("border", "1px solid #3b82f6")
+                    .style("padding", "10px 30px")
+                    .style("border-radius", "6px")
+                    .style("font-size", "16px")
+                    .text("Categories")
+                    .event(clone!(state => move |_: events::Click| {
+                        state.page.set(AppPage::CategoryManager);
+                    }))
+                }))
             })
         )
     })
