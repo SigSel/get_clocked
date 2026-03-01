@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background: dark rounded circle -->
+  <rect width="512" height="512" rx="115" ry="115" fill="#1e2030"/>
+
+  <!-- Clock face: light circle with dark border -->
+  <circle cx="256" cy="256" r="210" fill="#e8e8f0" stroke="#1e2030" stroke-width="10"/>
+
+  <!-- Major tick marks at 12, 3, 6, 9 -->
+  <line x1="256" y1="63"  x2="256" y2="91"  stroke="#1e2030" stroke-width="12" stroke-linecap="round"/>
+  <line x1="449" y1="256" x2="421" y2="256" stroke="#1e2030" stroke-width="12" stroke-linecap="round"/>
+  <line x1="256" y1="449" x2="256" y2="421" stroke="#1e2030" stroke-width="12" stroke-linecap="round"/>
+  <line x1="63"  y1="256" x2="91"  y2="256" stroke="#1e2030" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Minor tick marks at remaining hour positions -->
+  <!-- 30° (1 o'clock) -->
+  <line x1="353" y1="89"  x2="344" y2="104" stroke="#1e2030" stroke-width="6" stroke-linecap="round"/>
+  <!-- 60° (2 o'clock) -->
+  <line x1="423" y1="160" x2="408" y2="169" stroke="#1e2030" stroke-width="6" stroke-linecap="round"/>
+  <!-- 120° (4 o'clock) -->
+  <line x1="423" y1="353" x2="408" y2="344" stroke="#1e2030" stroke-width="6" stroke-linecap="round"/>
+  <!-- 150° (5 o'clock) -->
+  <line x1="353" y1="423" x2="344" y2="408" stroke="#1e2030" stroke-width="6" stroke-linecap="round"/>
+  <!-- 210° (7 o'clock) -->
+  <line x1="160" y1="423" x2="169" y2="408" stroke="#1e2030" stroke-width="6" stroke-linecap="round"/>
+  <!-- 240° (8 o'clock) -->
+  <line x1="89"  y1="353" x2="104" y2="344" stroke="#1e2030" stroke-width="6" stroke-linecap="round"/>
+  <!-- 300° (10 o'clock) -->
+  <line x1="89"  y1="160" x2="104" y2="169" stroke="#1e2030" stroke-width="6" stroke-linecap="round"/>
+  <!-- 330° (11 o'clock) -->
+  <line x1="160" y1="89"  x2="169" y2="104" stroke="#1e2030" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Minute hand: pointing toward 2 (60° from 12), length ~160 -->
+  <line x1="256" y1="256" x2="395" y2="176" stroke="#2a2d3e" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Hour hand: pointing toward 10 (305° from 12), length ~115 -->
+  <line x1="256" y1="256" x2="162" y2="190" stroke="#2a2d3e" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- Center dot: teal accent -->
+  <circle cx="256" cy="256" r="12" fill="#4fc3f7"/>
+</svg>
