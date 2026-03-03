@@ -9,6 +9,8 @@ struct Settings {
     template_folder: String,
     #[serde(default = "default_date_format")]
     date_format: String,
+    #[serde(default)]
+    padding_columns: u32,
 }
 
 fn default_date_format() -> String { "YYYY-MM-DD".to_string() }
@@ -20,6 +22,7 @@ impl Default for Settings {
             export_format: "csv".to_string(),
             template_folder: String::new(),
             date_format: default_date_format(),
+            padding_columns: 0,
         }
     }
 }
@@ -48,12 +51,14 @@ fn save_settings(
     export_format: String,
     template_folder: String,
     date_format: String,
+    padding_columns: String,
 ) -> Result<(), String> {
     let path = settings_path(&app)?;
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let settings = Settings { export_folder, export_format, template_folder, date_format };
+    let padding_columns: u32 = padding_columns.parse().unwrap_or(0);
+    let settings = Settings { export_folder, export_format, template_folder, date_format, padding_columns };
     let content = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     std::fs::write(&path, content).map_err(|e| e.to_string())
 }
@@ -244,6 +249,7 @@ fn export_workday(
     date: String,
     date_format: String,
     entries: Vec<WorkEntry>,
+    padding_columns: u32,
 ) -> Result<(), String> {
     let dir = std::path::Path::new(&folder);
     if !dir.exists() {
@@ -253,9 +259,9 @@ fn export_workday(
     let path = dir.join(format!("workday_{}.{}", date, ext));
     let display_date = format_date_for_export(&date, &date_format);
     if format == "xlsx" {
-        export_xlsx(&path, &entries, &display_date)
+        export_xlsx(&path, &entries, &display_date, padding_columns)
     } else {
-        export_csv(&path, &entries, &display_date)
+        export_csv(&path, &entries, &display_date, padding_columns)
     }
 }
 
@@ -271,11 +277,12 @@ fn collect_columns(entries: &[WorkEntry]) -> Vec<String> {
     cols
 }
 
-fn export_csv(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Result<(), String> {
+fn export_csv(path: &std::path::Path, entries: &[WorkEntry], date: &str, padding_columns: u32) -> Result<(), String> {
     let cols = collect_columns(entries);
     let mut wtr = csv::Writer::from_path(path).map_err(|e| e.to_string())?;
     let mut header = vec!["Date".to_string()];
     header.extend_from_slice(&cols);
+    for _ in 0..padding_columns { header.push(String::new()); }
     header.push("Hours".to_string());
     wtr.write_record(&header).map_err(|e| e.to_string())?;
     for e in entries {
@@ -285,15 +292,17 @@ fn export_csv(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Resu
         for col in &cols {
             row.push(map.get(col.as_str()).unwrap_or(&"").to_string());
         }
+        for _ in 0..padding_columns { row.push(String::new()); }
         row.push(format!("{:.1}", e.hours));
         wtr.write_record(&row).map_err(|e| e.to_string())?;
     }
     wtr.flush().map_err(|e| e.to_string())
 }
 
-fn export_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Result<(), String> {
+fn export_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str, padding_columns: u32) -> Result<(), String> {
     use rust_xlsxwriter::{Format, Workbook};
     let cols = collect_columns(entries);
+    let pad = padding_columns as usize;
     let mut wb = Workbook::new();
     let ws = wb.add_worksheet();
     let bold = Format::new().set_bold();
@@ -302,7 +311,8 @@ fn export_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Res
         ws.write_with_format(0, (i + 1) as u16, col.as_str(), &bold)
             .map_err(|e| e.to_string())?;
     }
-    ws.write_with_format(0, (cols.len() + 1) as u16, "Hours", &bold).map_err(|e| e.to_string())?;
+    let hours_col = (cols.len() + 1 + pad) as u16;
+    ws.write_with_format(0, hours_col, "Hours", &bold).map_err(|e| e.to_string())?;
     for (ri, e) in entries.iter().enumerate() {
         let row = (ri + 1) as u32;
         ws.write(row, 0, date).map_err(|e| e.to_string())?;
@@ -312,13 +322,13 @@ fn export_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Res
             ws.write(row, (ci + 1) as u16, *map.get(col.as_str()).unwrap_or(&""))
                 .map_err(|e| e.to_string())?;
         }
-        ws.write(row, (cols.len() + 1) as u16, e.hours).map_err(|e| e.to_string())?;
+        ws.write(row, hours_col, e.hours).map_err(|e| e.to_string())?;
     }
     wb.save(path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-fn export_monthly(folder: String, format: String, date: String, date_format: String, entries: Vec<WorkEntry>) -> Result<(), String> {
+fn export_monthly(folder: String, format: String, date: String, date_format: String, entries: Vec<WorkEntry>, padding_columns: u32) -> Result<(), String> {
     let folder_path = std::path::Path::new(&folder);
     if !folder_path.exists() {
         return Err(format!("Export folder does not exist: {}", folder));
@@ -328,22 +338,22 @@ fn export_monthly(folder: String, format: String, date: String, date_format: Str
     match format.as_str() {
         "xlsx" => {
             let path = folder_path.join(format!("monthly_{}.xlsx", month));
-            export_monthly_xlsx(&path, &entries, &display_date)
+            export_monthly_xlsx(&path, &entries, &display_date, padding_columns)
         }
         _ => {
             let path = folder_path.join(format!("monthly_{}.csv", month));
-            export_monthly_csv(&path, &entries, &display_date)
+            export_monthly_csv(&path, &entries, &display_date, padding_columns)
         }
     }
 }
 
-fn export_monthly_csv(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Result<(), String> {
+fn export_monthly_csv(path: &std::path::Path, entries: &[WorkEntry], date: &str, padding_columns: u32) -> Result<(), String> {
     if path.exists() {
         let mut rdr = csv::Reader::from_path(path).map_err(|e| e.to_string())?;
         let raw_headers = rdr.headers().map_err(|e| e.to_string())?;
         let cols: Vec<String> = raw_headers.iter()
             .skip(1)
-            .filter(|h| *h != "Hours")
+            .filter(|h| *h != "Hours" && !h.is_empty())
             .map(|h| h.to_string())
             .collect();
         drop(rdr);
@@ -353,16 +363,17 @@ fn export_monthly_csv(path: &std::path::Path, entries: &[WorkEntry], date: &str)
             .open(path)
             .map_err(|e| e.to_string())?;
         let mut wtr = csv::Writer::from_writer(file);
-        write_monthly_rows(&mut wtr, entries, &cols, date)?;
+        write_monthly_rows(&mut wtr, entries, &cols, date, padding_columns)?;
         wtr.flush().map_err(|e| e.to_string())
     } else {
         let cols = collect_columns(entries);
         let mut wtr = csv::Writer::from_path(path).map_err(|e| e.to_string())?;
         let mut header = vec!["Date".to_string()];
         header.extend_from_slice(&cols);
+        for _ in 0..padding_columns { header.push(String::new()); }
         header.push("Hours".to_string());
         wtr.write_record(&header).map_err(|e| e.to_string())?;
-        write_monthly_rows(&mut wtr, entries, &cols, date)?;
+        write_monthly_rows(&mut wtr, entries, &cols, date, padding_columns)?;
         wtr.flush().map_err(|e| e.to_string())
     }
 }
@@ -372,6 +383,7 @@ fn write_monthly_rows<W: std::io::Write>(
     entries: &[WorkEntry],
     cols: &[String],
     date: &str,
+    padding_columns: u32,
 ) -> Result<(), String> {
     for e in entries {
         let map: std::collections::HashMap<&str, &str> =
@@ -380,13 +392,14 @@ fn write_monthly_rows<W: std::io::Write>(
         for col in cols {
             row.push(map.get(col.as_str()).unwrap_or(&"").to_string());
         }
+        for _ in 0..padding_columns { row.push(String::new()); }
         row.push(format!("{:.1}", e.hours));
         wtr.write_record(&row).map_err(|e| e.to_string())?;
     }
     Ok(())
 }
 
-fn export_monthly_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str) -> Result<(), String> {
+fn export_monthly_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str, padding_columns: u32) -> Result<(), String> {
     use rust_xlsxwriter::{Format, Workbook};
 
     let (merged_cols, existing_rows): (Vec<String>, Vec<Vec<String>>) = if path.exists() {
@@ -425,13 +438,15 @@ fn export_monthly_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str
     let ws = wb.add_worksheet();
     let bold = Format::new().set_bold();
 
+    let pad = padding_columns as usize;
     ws.write_with_format(0, 0, "Date", &bold).map_err(|e| e.to_string())?;
     for (i, col) in merged_cols.iter().enumerate() {
         ws.write_with_format(0, (i + 1) as u16, col.as_str(), &bold).map_err(|e| e.to_string())?;
     }
-    ws.write_with_format(0, (merged_cols.len() + 1) as u16, "Hours", &bold).map_err(|e| e.to_string())?;
+    let hours_col = (merged_cols.len() + 1 + pad) as u16;
+    ws.write_with_format(0, hours_col, "Hours", &bold).map_err(|e| e.to_string())?;
 
-    let existing_col_count = merged_cols.len() + 2;
+    let existing_col_count = merged_cols.len() + 2 + pad;
     for (ri, row) in existing_rows.iter().enumerate() {
         let excel_row = (ri + 1) as u32;
         for (ci, val) in row.iter().enumerate().take(existing_col_count) {
@@ -449,7 +464,7 @@ fn export_monthly_xlsx(path: &std::path::Path, entries: &[WorkEntry], date: &str
             ws.write(excel_row, (ci + 1) as u16, *map.get(col.as_str()).unwrap_or(&""))
                 .map_err(|e| e.to_string())?;
         }
-        ws.write(excel_row, (merged_cols.len() + 1) as u16, e.hours).map_err(|e| e.to_string())?;
+        ws.write(excel_row, hours_col, e.hours).map_err(|e| e.to_string())?;
     }
 
     wb.save(path).map_err(|e| e.to_string())

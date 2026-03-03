@@ -54,6 +54,7 @@ fn render_content(state: Arc<AppState>) -> Dom {
             .child(render_template_folder_section(state.clone()))
             .child(render_format_section(state.clone()))
             .child(render_date_format_section(state.clone()))
+            .child(render_padding_columns_section(state.clone()))
             .child(render_save_button(state.clone()))
         }))
     })
@@ -300,6 +301,52 @@ fn render_date_format_section(state: Arc<AppState>) -> Dom {
                 .with_node!(element => {
                     .event(clone!(state => move |_: events::Change| {
                         state.date_format.set(DateFormat::from_str(&element.value()));
+                    }))
+                })
+            })
+        )
+    })
+}
+
+fn render_padding_columns_section(state: Arc<AppState>) -> Dom {
+    use web_sys::HtmlInputElement;
+
+    let current = state.padding_columns.get();
+
+    html!("div", {
+        .dwclass!("flex flex-col gap-2")
+        .child(
+            html!("label", {
+                .dwclass!("font-medium")
+                .style("color", "#d1d5db")
+                .style("font-size", "16px")
+                .text("Padding Columns")
+            })
+        )
+        .child(
+            html!("span", {
+                .style("color", "#9ca3af")
+                .style("font-size", "14px")
+                .text("Empty columns between categories and hours")
+            })
+        )
+        .child(
+            html!("input" => HtmlInputElement, {
+                .attr("type", "number")
+                .attr("min", "0")
+                .style("background", "#374151")
+                .style("color", "white")
+                .style("border", "1px solid #4b5563")
+                .style("border-radius", "4px")
+                .style("padding", "8px 16px")
+                .style("font-size", "1rem")
+                .style("width", "260px")
+                .prop("value", current.to_string())
+                .with_node!(el => {
+                    .event(clone!(state => move |_: events::Input| {
+                        if let Ok(v) = el.value().parse::<u32>() {
+                            state.padding_columns.set(v);
+                        }
                     }))
                 })
             })

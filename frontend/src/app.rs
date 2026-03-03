@@ -249,6 +249,7 @@ pub struct AppState {
     pub export_format: Mutable<ExportFormat>,
     pub template_folder: Mutable<String>,
     pub date_format: Mutable<DateFormat>,
+    pub padding_columns: Mutable<u32>,
     pub workday: Arc<WorkdayState>,
     pub template_maker: Arc<TemplateMakerState>,
     pub category_definitions: Mutable<Vec<CategoryDefinition>>,
@@ -265,6 +266,8 @@ struct Settings {
     template_folder: String,
     #[serde(default = "default_date_format_str")]
     date_format: String,
+    #[serde(default)]
+    padding_columns: u32,
 }
 
 #[derive(serde::Serialize)]
@@ -274,6 +277,7 @@ struct SaveArgs {
     export_format: String,
     template_folder: String,
     date_format: String,
+    padding_columns: String,
 }
 
 impl AppState {
@@ -300,6 +304,7 @@ impl AppState {
             export_format: Mutable::new(ExportFormat::from_str(&settings.export_format)),
             template_folder: Mutable::new(settings.template_folder),
             date_format: Mutable::new(DateFormat::from_str(&settings.date_format)),
+            padding_columns: Mutable::new(settings.padding_columns),
             workday: Arc::new(WorkdayState::new()),
             template_maker: TemplateMakerState::new(),
             category_definitions: Mutable::new(categories),
@@ -313,6 +318,7 @@ impl AppState {
             export_format: state.export_format.lock_ref().as_str().to_string(),
             template_folder: state.template_folder.lock_ref().clone(),
             date_format: state.date_format.lock_ref().as_str().to_string(),
+            padding_columns: state.padding_columns.get().to_string(),
         };
         let args = tauri_wasm::args(&raw_args).map_err(|e| e.to_string())?;
         tauri_wasm::invoke("save_settings")

@@ -19,6 +19,7 @@ struct ExportArgs {
     date: String,
     date_format: String,
     entries: Vec<WorkEntry>,
+    padding_columns: u32,
 }
 
 #[derive(serde::Serialize)]
@@ -29,6 +30,7 @@ struct MonthlyArgs {
     date: String,
     date_format: String,
     entries: Vec<WorkEntry>,
+    padding_columns: u32,
 }
 
 pub fn render(state: Arc<AppState>) -> Dom {
@@ -505,7 +507,8 @@ fn render_action_bar(state: Arc<AppState>) -> Dom {
                     }
                     let iso_date = wd.date.lock_ref().clone();
                     let display_date = state.date_format.lock_ref().format_date(&iso_date);
-                    let text = format_as_tsv(&entries, &display_date);
+                    let padding = state.padding_columns.get();
+                    let text = format_as_tsv(&entries, &display_date, padding);
                     copy_to_clipboard(text, wd.clone());
                 }))
             }))
@@ -546,7 +549,7 @@ fn render_action_bar(state: Arc<AppState>) -> Dom {
     })
 }
 
-fn format_as_tsv(entries: &[WorkEntry], date: &str) -> String {
+fn format_as_tsv(entries: &[WorkEntry], date: &str, padding_columns: u32) -> String {
     let mut cols: Vec<String> = Vec::new();
     for e in entries {
         for (k, _) in &e.categories {
@@ -555,9 +558,11 @@ fn format_as_tsv(entries: &[WorkEntry], date: &str) -> String {
             }
         }
     }
+    let pad = std::iter::repeat(String::new()).take(padding_columns as usize);
     let mut rows = vec![
         std::iter::once("Date".to_string())
             .chain(cols.iter().cloned())
+            .chain(pad.clone())
             .chain(std::iter::once("Hours".to_string()))
             .collect::<Vec<_>>()
             .join("\t"),
@@ -567,6 +572,7 @@ fn format_as_tsv(entries: &[WorkEntry], date: &str) -> String {
             e.categories.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
         let row = std::iter::once(date.to_string())
             .chain(cols.iter().map(|c| map.get(c.as_str()).unwrap_or(&"").to_string()))
+            .chain(pad.clone())
             .chain(std::iter::once(format!("{:.1}", e.hours)))
             .collect::<Vec<_>>()
             .join("\t");
@@ -624,12 +630,14 @@ async fn do_export(state: Arc<AppState>) {
     let format = state.export_format.lock_ref().as_str().to_string();
     let date_format = state.date_format.lock_ref().as_str().to_string();
     let date = wd.date.lock_ref().clone();
+    let padding_columns = state.padding_columns.get();
     let raw_args = ExportArgs {
         folder: folder.clone(),
         format: format.clone(),
         date: date.clone(),
         date_format: date_format.clone(),
         entries: entries.clone(),
+        padding_columns,
     };
     let args = match tauri_wasm::args(&raw_args) {
         Ok(a) => a,
@@ -642,7 +650,7 @@ async fn do_export(state: Arc<AppState>) {
         Ok(_) => {
             wd.status_msg.set(Some("Exported!".to_string()));
             if wd.include_monthly.get() {
-                let monthly_args = MonthlyArgs { folder, format, date, date_format, entries };
+                let monthly_args = MonthlyArgs { folder, format, date, date_format, entries, padding_columns };
                 if let Ok(args) = tauri_wasm::args(&monthly_args) {
                     let _ = tauri_wasm::invoke("export_monthly").with_args(args).await;
                 };
