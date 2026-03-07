@@ -25,6 +25,7 @@ A multi-page dark-themed desktop app built with Tauri 2 (native shell) and a Rus
 | `csv` | CSV file generation |
 | `serde` + `serde_json` | Serialization/deserialization |
 | `web-sys` | Browser/DOM APIs (clipboard, inputs) |
+| `calamine` | Read CSV/XLSX files for category import |
 
 ## Dev Commands
 
@@ -44,7 +45,7 @@ cargo tauri build
 ```
 Cargo.toml          # Workspace root
 .github/workflows/
-  ci.yml            # CI: cross-platform build verification
+  ci.yml            # CI: cross-platform build verification (path-filtered)
   release.yml       # Release: builds + GitHub Release on version tags
 frontend/
   Cargo.toml        # Frontend WASM crate
@@ -64,7 +65,7 @@ frontend/
 src-tauri/
   src/main.rs       # Tauri backend entrypoint
   tauri.conf.json   # App config (name, window size, build commands)
-  Cargo.toml        # Backend crate (v0.1.3)
+  Cargo.toml        # Backend crate (v0.3.0)
   capabilities/     # Tauri permission capabilities
   icons/            # App icons (PNG, ICNS, ICO)
 target/             # Rust build artifacts (gitignored)
@@ -72,7 +73,7 @@ target/             # Rust build artifacts (gitignored)
 
 ## App Config
 
-- Version: 0.1.3
+- Version: 0.3.0
 - Window: 900×600, title "Get Clocked"
 - Identifier: `com.getclocked.app`
 - Dev URL: `http://localhost:8080` (Trunk)
@@ -80,7 +81,7 @@ target/             # Rust build artifacts (gitignored)
 
 **Backend commands:** `get_settings`, `save_settings`, `pick_folder`, `export_workday`, `export_monthly`, `save_template`, `list_templates`, `delete_template`, `get_categories`, `save_categories`, `pick_categories_file`, `import_categories`
 
-**Settings** (`$APP_CONFIG_DIR/settings.json`): `export_folder`, `export_format`, `template_folder`
+**Settings** (`$APP_CONFIG_DIR/settings.json`): `export_folder`, `export_format`, `template_folder`, `date_format`, `padding_columns`
 
 **Category definitions** (`$APP_CONFIG_DIR/category_definitions.json`): list of `{ name, values[] }` entries used for autocomplete in RegisterWorkday and TemplateMaker; can be imported from CSV/XLSX via CategoryManager.
 

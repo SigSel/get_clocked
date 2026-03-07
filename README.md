@@ -21,7 +21,9 @@ A cross-platform desktop time-tracking app built with Tauri 2 and a Rust/WASM fr
 - Template selector in the draft entry form pre-populates categories from a saved template
 - Define reusable category names and allowed values via the Category Manager page
 - Import category definitions from existing CSV/XLSX files
-- Persistent settings: export folder, export format, and template folder
+- Configurable date format (DD-MM-YYYY, MM-DD-YYYY, YYYY-MM-DD, DD/MM/YYYY)
+- Configurable padding columns between categories and hours in exports
+- Persistent settings: export folder, export format, template folder, date format, and padding columns
 
 ## Tech Stack
 
@@ -79,11 +81,11 @@ cargo tauri build
 
 ## CI/CD
 
-- **CI** — Builds and verifies on Linux, Windows, and macOS on every push to `main`
+- **CI** — Builds and verifies on Linux, Windows, and macOS on every push to `main` (path-filtered to only run on app changes)
 - **Release** — Triggered by version tags (`v*`), creates a GitHub Release with platform binaries (AppImage, .exe, .dmg)
 
 ## App Window
 
 - Size: 900×600
 - Theme: dark
-- Version: 0.1.3
+- Version: 0.3.0
