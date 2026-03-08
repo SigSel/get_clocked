@@ -3,12 +3,12 @@ use std::sync::Arc;
 use dominator::{clone, events, html, with_node, Dom};
 use dwind::prelude::*;
 use dwind_macros::dwclass;
-use futures_signals::signal::SignalExt;
 use futures_signals::signal_vec::SignalVecExt;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 
 use crate::app::{AppPage, AppState, DraftCategory, TemplateMakerState, TemplateData};
+use crate::components;
 
 #[derive(serde::Serialize)]
 struct SaveTemplateArgs {
@@ -56,7 +56,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
     html!("div", {
         .dwclass!("w-full h-screen bg-gray-900 flex flex-col")
         .style("color", "white")
-        .child(render_category_keys_datalist(state.clone()))
+        .child(components::render_category_keys_datalist(state.clone()))
         .child(render_header(state.clone()))
         .child(html!("div", {
             .dwclass!("flex flex-col items-center justify-center")
@@ -70,18 +70,10 @@ pub fn render(state: Arc<AppState>) -> Dom {
                 .child(render_categories(tm.clone(), state.clone()))
                 .child(render_add_category_button(tm.clone()))
                 .child_signal(tm.error_msg.signal_ref(|msg| {
-                    msg.as_ref().map(|m| html!("span", {
-                        .style("color", "#f87171")
-                        .style("font-size", "15px")
-                        .text(m)
-                    }))
+                    components::render_error_message(msg)
                 }))
                 .child_signal(tm.status_msg.signal_ref(|msg| {
-                    msg.as_ref().map(|m| html!("span", {
-                        .style("color", "#6ee7b7")
-                        .style("font-size", "16px")
-                        .text(m)
-                    }))
+                    components::render_status_message(msg)
                 }))
                 .child(render_action_buttons(state.clone()))
                 .child(render_templates_list(state.clone()))
@@ -96,11 +88,7 @@ fn render_header(state: Arc<AppState>) -> Dom {
         .dwclass!("flex items-center gap-4 p-4")
         .style("border-bottom", "1px solid #374151")
         .child(html!("button", {
-            .style("background", "none")
-            .style("border", "none")
-            .style("color", "#d1d5db")
-            .style("cursor", "pointer")
-            .style("font-size", "17px")
+            .apply(components::back_button_styles)
             .text("← Back")
             .event(clone!(state => move |_: events::Click| {
                 state.template_maker.reset();
@@ -119,17 +107,13 @@ fn render_name_input(tm: Arc<TemplateMakerState>) -> Dom {
         .dwclass!("flex flex-col gap-2")
         .child(html!("label", {
             .dwclass!("font-medium")
-            .style("color", "#d1d5db")
-            .style("font-size", "16px")
+            .apply(components::label_styles)
             .text("Template Name")
         }))
         .child(html!("input" => HtmlInputElement, {
             .attr("type", "text")
             .attr("placeholder", "Template name")
-            .style("background", "#374151")
-            .style("color", "white")
-            .style("border", "1px solid #4b5563")
-            .style("border-radius", "4px")
+            .apply(components::input_styles)
             .style("padding", "10px 16px")
             .style("font-size", "17px")
             .style("width", "100%")
@@ -148,106 +132,14 @@ fn render_categories(tm: Arc<TemplateMakerState>, state: Arc<AppState>) -> Dom {
     html!("div", {
         .dwclass!("flex flex-col gap-2")
         .children_signal_vec(tm.categories.signal_vec_cloned().map(clone!(tm, state => move |cat| {
-            render_category_row(tm.clone(), state.clone(), cat)
+            components::render_category_row(&tm.categories, &state.category_definitions, cat)
         })))
-    })
-}
-
-fn render_category_row(tm: Arc<TemplateMakerState>, state: Arc<AppState>, cat: Arc<DraftCategory>) -> Dom {
-    let val_list_id = format!("cat-val-{:x}", Arc::as_ptr(&cat) as usize);
-    let value_options = futures_signals::map_ref! {
-        let key = cat.key.signal_cloned(),
-        let defs = state.category_definitions.signal_cloned()
-        => {
-            defs.iter().find(|d| d.name == *key)
-                .map(|d| d.values.clone()).unwrap_or_default()
-        }
-    };
-    html!("div", {
-        .dwclass!("flex items-center gap-2")
-        .child(html!("datalist", {
-            .attr("id", &val_list_id)
-            .children_signal_vec(
-                value_options
-                    .map(|vals| vals.into_iter()
-                        .map(|v| html!("option", { .attr("value", &v) }))
-                        .collect::<Vec<_>>())
-                    .to_signal_vec()
-            )
-        }))
-        .child(html!("input" => HtmlInputElement, {
-            .attr("type", "text")
-            .attr("placeholder", "Category")
-            .attr("list", "cat-keys-datalist")
-            .style("background", "#374151")
-            .style("color", "white")
-            .style("border", "1px solid #4b5563")
-            .style("border-radius", "4px")
-            .style("padding", "8px 14px")
-            .style("width", "160px")
-            .style("font-size", "16px")
-            .prop_signal("value", cat.key.signal_cloned())
-            .with_node!(el => {
-                .event(clone!(cat => move |_: events::Input| {
-                    cat.key.set(el.value());
-                }))
-            })
-        }))
-        .child(html!("input" => HtmlInputElement, {
-            .attr("type", "text")
-            .attr("placeholder", "Value")
-            .attr("list", &val_list_id)
-            .style("background", "#374151")
-            .style("color", "white")
-            .style("border", "1px solid #4b5563")
-            .style("border-radius", "4px")
-            .style("padding", "8px 14px")
-            .style("width", "160px")
-            .style("font-size", "16px")
-            .prop_signal("value", cat.value.signal_cloned())
-            .with_node!(el => {
-                .event(clone!(cat => move |_: events::Input| {
-                    cat.value.set(el.value());
-                }))
-            })
-        }))
-        .child(html!("button", {
-            .style("background", "none")
-            .style("color", "#f87171")
-            .style("border", "none")
-            .style("cursor", "pointer")
-            .style("font-size", "14px")
-            .text("✕")
-            .event(clone!(tm, cat => move |_: events::Click| {
-                let ptr = Arc::as_ptr(&cat);
-                tm.categories.lock_mut().retain(|c| Arc::as_ptr(c) != ptr);
-            }))
-        }))
-    })
-}
-
-fn render_category_keys_datalist(state: Arc<AppState>) -> Dom {
-    html!("datalist", {
-        .attr("id", "cat-keys-datalist")
-        .children_signal_vec(
-            state.category_definitions.signal_cloned()
-                .map(|defs| defs.into_iter()
-                    .map(|d| html!("option", { .attr("value", &d.name) }))
-                    .collect::<Vec<_>>())
-                .to_signal_vec()
-        )
     })
 }
 
 fn render_add_category_button(tm: Arc<TemplateMakerState>) -> Dom {
     html!("button", {
-        .style("background", "none")
-        .style("color", "#60a5fa")
-        .style("border", "1px solid #60a5fa")
-        .style("border-radius", "4px")
-        .style("padding", "6px 14px")
-        .style("cursor", "pointer")
-        .style("font-size", "15px")
+        .apply(components::secondary_button_styles)
         .style("align-self", "flex-start")
         .text("+ Category")
         .event(clone!(tm => move |_: events::Click| {
@@ -290,14 +182,9 @@ fn render_save_button(state: Arc<AppState>, is_editing: bool) -> Dom {
     let label = if is_editing { "Update Template" } else { "Save Template" };
     html!("button", {
         .dwclass!("cursor-pointer font-semibold")
-        .style("background", "#16a34a")
-        .style("color", "white")
-        .style("border", "none")
-        .style("padding", "10px 26px")
-        .style("border-radius", "4px")
+        .apply(components::primary_button_styles)
         .style("align-self", "flex-start")
         .style("margin-top", "8px")
-        .style("font-size", "16px")
         .text(label)
         .event(clone!(state => move |_: events::Click| {
             let state = state.clone();
@@ -319,7 +206,6 @@ fn render_save_button(state: Arc<AppState>, is_editing: bool) -> Dom {
                     .collect::<Vec<_>>();
                 tm.error_msg.set(None);
 
-                // If editing, delete the old file first (handles renames)
                 let original_name = tm.editing_original_name.lock_ref().clone();
                 if let Some(orig) = original_name {
                     invoke_delete_template(folder.clone(), orig).await;
@@ -355,8 +241,7 @@ fn render_templates_list(state: Arc<AppState>) -> Dom {
         .style("margin-top", "16px")
         .child(html!("h3", {
             .dwclass!("font-semibold")
-            .style("color", "#d1d5db")
-            .style("font-size", "16px")
+            .apply(components::label_styles)
             .text("Saved Templates")
         }))
         .children_signal_vec(tm.templates.signal_vec_cloned()
@@ -378,12 +263,8 @@ fn render_template_row(state: Arc<AppState>, template: TemplateData) -> Dom {
             .text(&template.name)
         }))
         .child(html!("button", {
-            .style("background", "none")
-            .style("color", "#60a5fa")
-            .style("border", "1px solid #60a5fa")
-            .style("border-radius", "4px")
+            .apply(components::secondary_button_styles)
             .style("padding", "4px 12px")
-            .style("cursor", "pointer")
             .style("font-size", "14px")
             .text("Edit")
             .event(clone!(tm, template => move |_: events::Click| {
@@ -404,13 +285,7 @@ fn render_template_row(state: Arc<AppState>, template: TemplateData) -> Dom {
             }))
         }))
         .child(html!("button", {
-            .style("background", "none")
-            .style("color", "#f87171")
-            .style("border", "1px solid #f87171")
-            .style("border-radius", "4px")
-            .style("padding", "4px 12px")
-            .style("cursor", "pointer")
-            .style("font-size", "14px")
+            .apply(components::danger_button_styles)
             .text("Delete")
             .event(clone!(state, template => move |_: events::Click| {
                 let state = state.clone();

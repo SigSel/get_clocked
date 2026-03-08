@@ -4,6 +4,7 @@ use dominator::{append_dom, body};
 use wasm_bindgen::prelude::*;
 
 mod app;
+pub mod components;
 mod pages;
 
 #[wasm_bindgen(start)]

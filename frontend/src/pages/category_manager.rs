@@ -9,6 +9,7 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlInputElement;
 
 use crate::app::{AppPage, AppState, CategoryDefinition, CategoryManagerState, DraftCategoryDefinition};
+use crate::components;
 
 #[derive(serde::Serialize)]
 struct SaveCategoriesArgs {
@@ -23,7 +24,6 @@ struct ImportCategoriesArgs {
 pub fn render(state: Arc<AppState>) -> Dom {
     let cm = state.category_manager.clone();
 
-    // Populate definitions from state.category_definitions on mount
     {
         let defs = state.category_definitions.lock_ref().clone();
         let mut lock = cm.definitions.lock_mut();
@@ -46,30 +46,16 @@ pub fn render(state: Arc<AppState>) -> Dom {
                 .dwclass!("flex flex-col gap-4")
                 .style("width", "640px")
                 .child_signal(cm.status_msg.signal_ref(|msg| {
-                    msg.as_ref().map(|m| html!("span", {
-                        .style("color", "#6ee7b7")
-                        .style("font-size", "16px")
-                        .text(m)
-                    }))
+                    components::render_status_message(msg)
                 }))
                 .child_signal(cm.error_msg.signal_ref(|msg| {
-                    msg.as_ref().map(|m| html!("span", {
-                        .style("color", "#f87171")
-                        .style("font-size", "15px")
-                        .text(m)
-                    }))
+                    components::render_error_message(msg)
                 }))
                 .children_signal_vec(cm.definitions.signal_vec_cloned().map(clone!(cm => move |def| {
                     render_definition_card(cm.clone(), def)
                 })))
                 .child(html!("button", {
-                    .style("background", "none")
-                    .style("color", "#60a5fa")
-                    .style("border", "1px solid #60a5fa")
-                    .style("border-radius", "4px")
-                    .style("padding", "6px 14px")
-                    .style("cursor", "pointer")
-                    .style("font-size", "15px")
+                    .apply(components::secondary_button_styles)
                     .style("align-self", "flex-start")
                     .text("+ Add Category")
                     .event(clone!(cm => move |_: events::Click| {
@@ -88,11 +74,7 @@ fn render_header(state: Arc<AppState>) -> Dom {
         .dwclass!("flex items-center gap-4 p-4")
         .style("border-bottom", "1px solid #374151")
         .child(html!("button", {
-            .style("background", "none")
-            .style("border", "none")
-            .style("color", "#d1d5db")
-            .style("cursor", "pointer")
-            .style("font-size", "17px")
+            .apply(components::back_button_styles)
             .text("← Back")
             .event(clone!(state => move |_: events::Click| {
                 state.page.set(AppPage::Home);
@@ -115,21 +97,15 @@ fn render_definition_card(cm: Arc<CategoryManagerState>, def: Arc<DraftCategoryD
         .child(html!("div", {
             .dwclass!("flex items-center gap-2")
             .child(html!("label", {
-                .style("color", "#d1d5db")
-                .style("font-size", "16px")
+                .apply(components::label_styles)
                 .style("min-width", "80px")
                 .text("Name")
             }))
             .child(html!("input" => HtmlInputElement, {
                 .attr("type", "text")
                 .attr("placeholder", "Category name")
-                .style("background", "#374151")
-                .style("color", "white")
-                .style("border", "1px solid #4b5563")
-                .style("border-radius", "4px")
-                .style("padding", "8px 14px")
+                .apply(components::input_styles)
                 .style("width", "200px")
-                .style("font-size", "16px")
                 .prop_signal("value", def.name.signal_cloned())
                 .with_node!(el => {
                     .event(clone!(def => move |_: events::Input| {
@@ -155,12 +131,8 @@ fn render_definition_card(cm: Arc<CategoryManagerState>, def: Arc<DraftCategoryD
             render_value_row(def.clone(), val)
         })))
         .child(html!("button", {
-            .style("background", "none")
-            .style("color", "#60a5fa")
-            .style("border", "1px solid #60a5fa")
-            .style("border-radius", "4px")
+            .apply(components::secondary_button_styles)
             .style("padding", "4px 12px")
-            .style("cursor", "pointer")
             .style("font-size", "14px")
             .style("align-self", "flex-start")
             .text("+ Add Value")
@@ -178,10 +150,7 @@ fn render_value_row(def: Arc<DraftCategoryDefinition>, val: Arc<Mutable<String>>
         .child(html!("input" => HtmlInputElement, {
             .attr("type", "text")
             .attr("placeholder", "Value")
-            .style("background", "#374151")
-            .style("color", "white")
-            .style("border", "1px solid #4b5563")
-            .style("border-radius", "4px")
+            .apply(components::input_styles)
             .style("padding", "6px 12px")
             .style("width", "200px")
             .style("font-size", "15px")
@@ -222,7 +191,6 @@ fn render_import_button(state: Arc<AppState>) -> Dom {
             let state = state.clone();
             spawn_local(async move {
                 let cm = &state.category_manager;
-                // 1. Pick file
                 let js_val = match tauri_wasm::invoke("pick_categories_file").await {
                     Ok(v) => v,
                     Err(e) => { cm.error_msg.set(Some(format!("Error: {:?}", e))); return; }
@@ -233,9 +201,8 @@ fn render_import_button(state: Arc<AppState>) -> Dom {
                 };
                 let path = match path_opt {
                     Some(p) => p,
-                    None => return, // user cancelled
+                    None => return,
                 };
-                // 2. Import
                 let raw_args = ImportCategoriesArgs { path };
                 let args = match tauri_wasm::args(&raw_args) {
                     Ok(a) => a,
@@ -249,7 +216,6 @@ fn render_import_button(state: Arc<AppState>) -> Dom {
                     Ok(v) => v,
                     Err(e) => { cm.error_msg.set(Some(format!("Error: {:?}", e))); return; }
                 };
-                // 3. Merge
                 let mut lock = cm.definitions.lock_mut();
                 for imported_def in &imported {
                     let existing_idx = lock.iter().position(|d| *d.name.lock_ref() == imported_def.name);
@@ -275,14 +241,9 @@ fn render_import_button(state: Arc<AppState>) -> Dom {
 fn render_save_button(state: Arc<AppState>) -> Dom {
     html!("button", {
         .dwclass!("cursor-pointer font-semibold")
-        .style("background", "#16a34a")
-        .style("color", "white")
-        .style("border", "none")
-        .style("padding", "10px 26px")
-        .style("border-radius", "4px")
+        .apply(components::primary_button_styles)
         .style("align-self", "flex-start")
         .style("margin-top", "8px")
-        .style("font-size", "16px")
         .text("Save Categories")
         .event(clone!(state => move |_: events::Click| {
             let state = state.clone();

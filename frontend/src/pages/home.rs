@@ -5,12 +5,12 @@ use dwind::prelude::*;
 use dwind_macros::dwclass;
 
 use crate::app::{AppPage, AppState};
+use crate::components;
 
 pub fn render(state: Arc<AppState>) -> Dom {
     html!("div", {
         .dwclass!("relative w-full h-screen bg-gray-900")
         .child(
-            // Gear icon button — top-right
             html!("button", {
                 .dwclass!("absolute top-4 right-4 cursor-pointer text-gray-400")
                 .style("background", "none")
@@ -25,7 +25,6 @@ pub fn render(state: Arc<AppState>) -> Dom {
             })
         )
         .child(
-            // Centered content
             html!("div", {
                 .dwclass!("flex flex-col items-center justify-center gap-8 w-full h-screen")
                 .child(html!("h1", {
@@ -34,11 +33,8 @@ pub fn render(state: Arc<AppState>) -> Dom {
                 }))
                 .child(html!("button", {
                     .dwclass!("cursor-pointer text-xl font-semibold")
-                    .style("background", "#2563eb")
-                    .style("color", "white")
-                    .style("border", "none")
+                    .apply(components::action_button_styles)
                     .style("padding", "14px 36px")
-                    .style("border-radius", "6px")
                     .text("Register Workday")
                     .event(clone!(state => move |_: events::Click| {
                         state.workday.reset();
@@ -47,11 +43,8 @@ pub fn render(state: Arc<AppState>) -> Dom {
                 }))
                 .child(html!("button", {
                     .dwclass!("cursor-pointer font-medium")
-                    .style("background", "none")
-                    .style("color", "#93c5fd")
-                    .style("border", "1px solid #3b82f6")
+                    .apply(components::secondary_button_styles)
                     .style("padding", "10px 30px")
-                    .style("border-radius", "6px")
                     .style("font-size", "16px")
                     .text("Templates")
                     .event(clone!(state => move |_: events::Click| {
@@ -61,11 +54,8 @@ pub fn render(state: Arc<AppState>) -> Dom {
                 }))
                 .child(html!("button", {
                     .dwclass!("cursor-pointer font-medium")
-                    .style("background", "none")
-                    .style("color", "#93c5fd")
-                    .style("border", "1px solid #3b82f6")
+                    .apply(components::secondary_button_styles)
                     .style("padding", "10px 30px")
-                    .style("border-radius", "6px")
                     .style("font-size", "16px")
                     .text("Categories")
                     .event(clone!(state => move |_: events::Click| {

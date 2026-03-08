@@ -7,6 +7,7 @@ use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlSelectElement;
 
 use crate::app::{AppPage, AppState, DateFormat, ExportFormat};
+use crate::components;
 
 pub fn render(state: Arc<AppState>) -> Dom {
     html!("div", {
@@ -23,11 +24,8 @@ fn render_header(state: Arc<AppState>) -> Dom {
         .child(
             html!("button", {
                 .dwclass!("cursor-pointer font-medium mr-4")
-                .style("background", "none")
-                .style("border", "none")
-                .style("color", "#d1d5db")
+                .apply(components::back_button_styles)
                 .style("padding", "6px 12px")
-                .style("font-size", "16px")
                 .text("← Back")
                 .event(clone!(state => move |_: events::Click| {
                     state.page.set(AppPage::Home);
@@ -66,8 +64,7 @@ fn render_folder_section(state: Arc<AppState>) -> Dom {
         .child(
             html!("label", {
                 .dwclass!("font-medium")
-                .style("color", "#d1d5db")
-                .style("font-size", "16px")
+                .apply(components::label_styles)
                 .text("Export Folder")
             })
         )
@@ -91,12 +88,8 @@ fn render_folder_section(state: Arc<AppState>) -> Dom {
                 .child(
                     html!("button", {
                         .dwclass!("cursor-pointer font-medium")
-                        .style("background", "#2563eb")
-                        .style("color", "white")
-                        .style("border", "none")
+                        .apply(components::action_button_styles)
                         .style("padding", "8px 16px")
-                        .style("border-radius", "4px")
-                        .style("font-size", "16px")
                         .text("Browse...")
                         .event(clone!(state => move |_: events::Click| {
                             let state = state.clone();
@@ -123,8 +116,7 @@ fn render_template_folder_section(state: Arc<AppState>) -> Dom {
         .child(
             html!("label", {
                 .dwclass!("font-medium")
-                .style("color", "#d1d5db")
-                .style("font-size", "16px")
+                .apply(components::label_styles)
                 .text("Template Folder")
             })
         )
@@ -148,12 +140,8 @@ fn render_template_folder_section(state: Arc<AppState>) -> Dom {
                 .child(
                     html!("button", {
                         .dwclass!("cursor-pointer font-medium")
-                        .style("background", "#2563eb")
-                        .style("color", "white")
-                        .style("border", "none")
+                        .apply(components::action_button_styles)
                         .style("padding", "8px 16px")
-                        .style("border-radius", "4px")
-                        .style("font-size", "16px")
                         .text("Browse...")
                         .event(clone!(state => move |_: events::Click| {
                             let state = state.clone();
@@ -182,20 +170,13 @@ fn render_format_section(state: Arc<AppState>) -> Dom {
         .child(
             html!("label", {
                 .dwclass!("font-medium")
-                .style("color", "#d1d5db")
-                .style("font-size", "16px")
+                .apply(components::label_styles)
                 .text("Export Format")
             })
         )
         .child(
             html!("select" => HtmlSelectElement, {
-                .style("background", "#374151")
-                .style("color", "white")
-                .style("border", "1px solid #4b5563")
-                .style("border-radius", "4px")
-                .style("padding", "8px 16px")
-                .style("font-size", "1rem")
-                .style("width", "260px")
+                .apply(components::select_styles)
                 .children(&mut [
                     html!("option", {
                         .attr("value", "csv")
@@ -222,7 +203,7 @@ fn render_format_section(state: Arc<AppState>) -> Dom {
                 ])
                 .with_node!(element => {
                     .event(clone!(state => move |_: events::Change| {
-                        state.export_format.set(ExportFormat::from_str(&element.value()));
+                        state.export_format.set(element.value().parse().unwrap_or_default());
                     }))
                 })
             })
@@ -238,20 +219,13 @@ fn render_date_format_section(state: Arc<AppState>) -> Dom {
         .child(
             html!("label", {
                 .dwclass!("font-medium")
-                .style("color", "#d1d5db")
-                .style("font-size", "16px")
+                .apply(components::label_styles)
                 .text("Date Format")
             })
         )
         .child(
             html!("select" => HtmlSelectElement, {
-                .style("background", "#374151")
-                .style("color", "white")
-                .style("border", "1px solid #4b5563")
-                .style("border-radius", "4px")
-                .style("padding", "8px 16px")
-                .style("font-size", "1rem")
-                .style("width", "260px")
+                .apply(components::select_styles)
                 .children(&mut [
                     html!("option", {
                         .attr("value", "YYYY-MM-DD")
@@ -300,7 +274,7 @@ fn render_date_format_section(state: Arc<AppState>) -> Dom {
                 ])
                 .with_node!(element => {
                     .event(clone!(state => move |_: events::Change| {
-                        state.date_format.set(DateFormat::from_str(&element.value()));
+                        state.date_format.set(element.value().parse().unwrap_or_default());
                     }))
                 })
             })
@@ -318,8 +292,7 @@ fn render_padding_columns_section(state: Arc<AppState>) -> Dom {
         .child(
             html!("label", {
                 .dwclass!("font-medium")
-                .style("color", "#d1d5db")
-                .style("font-size", "16px")
+                .apply(components::label_styles)
                 .text("Padding Columns")
             })
         )
@@ -334,13 +307,7 @@ fn render_padding_columns_section(state: Arc<AppState>) -> Dom {
             html!("input" => HtmlInputElement, {
                 .attr("type", "number")
                 .attr("min", "0")
-                .style("background", "#374151")
-                .style("color", "white")
-                .style("border", "1px solid #4b5563")
-                .style("border-radius", "4px")
-                .style("padding", "8px 16px")
-                .style("font-size", "1rem")
-                .style("width", "260px")
+                .apply(components::select_styles)
                 .prop("value", current.to_string())
                 .with_node!(el => {
                     .event(clone!(state => move |_: events::Input| {
@@ -357,14 +324,9 @@ fn render_padding_columns_section(state: Arc<AppState>) -> Dom {
 fn render_save_button(state: Arc<AppState>) -> Dom {
     html!("button", {
         .dwclass!("cursor-pointer font-medium")
-        .style("background", "#16a34a")
-        .style("color", "white")
-        .style("border", "none")
-        .style("padding", "10px 26px")
-        .style("border-radius", "4px")
+        .apply(components::primary_button_styles)
         .style("align-self", "flex-start")
         .style("margin-top", "8px")
-        .style("font-size", "16px")
         .text("Save")
         .event(clone!(state => move |_: events::Click| {
             let state = state.clone();

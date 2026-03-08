@@ -9,29 +9,8 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::{spawn_local, JsFuture};
 use web_sys::{HtmlInputElement, HtmlSelectElement};
 
-use crate::app::{AppPage, AppState, DraftCategory, TemplateData, WorkdayState, WorkEntry};
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ExportArgs {
-    folder: String,
-    format: String,
-    date: String,
-    date_format: String,
-    entries: Vec<WorkEntry>,
-    padding_columns: u32,
-}
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct MonthlyArgs {
-    folder: String,
-    format: String,
-    date: String,
-    date_format: String,
-    entries: Vec<WorkEntry>,
-    padding_columns: u32,
-}
+use crate::app::{AppPage, AppState, DraftCategory, ExportArgs, TemplateData, WorkdayState, WorkEntry};
+use crate::components;
 
 pub fn render(state: Arc<AppState>) -> Dom {
     let wd = state.workday.clone();
@@ -58,7 +37,7 @@ pub fn render(state: Arc<AppState>) -> Dom {
     html!("div", {
         .dwclass!("relative w-full h-screen bg-gray-900 flex flex-col")
         .style("color", "white")
-        .child(render_category_keys_datalist(state.clone()))
+        .child(components::render_category_keys_datalist(state.clone()))
         .event(|_: events::MouseDown| {
             if let Some(window) = web_sys::window() {
                 if let Some(doc) = window.document() {
@@ -96,11 +75,7 @@ fn render_header(state: Arc<AppState>) -> Dom {
         .dwclass!("flex items-center gap-4 p-4")
         .style("border-bottom", "1px solid #374151")
         .child(html!("button", {
-            .style("background", "none")
-            .style("border", "none")
-            .style("color", "#d1d5db")
-            .style("cursor", "pointer")
-            .style("font-size", "17px")
+            .apply(components::back_button_styles)
             .text("← Back")
             .event(clone!(state => move |_: events::Click| {
                 state.workday.reset();
@@ -118,17 +93,13 @@ fn render_date_section(wd: Arc<WorkdayState>) -> Dom {
     html!("div", {
         .dwclass!("flex items-center gap-4")
         .child(html!("label", {
-            .style("color", "#d1d5db")
+            .apply(components::label_styles)
             .style("font-size", "17px")
             .text("Date")
         }))
         .child(html!("input" => HtmlInputElement, {
             .attr("type", "date")
-            .style("background", "#374151")
-            .style("color", "white")
-            .style("border", "1px solid #4b5563")
-            .style("border-radius", "4px")
-            .style("padding", "8px 14px")
+            .apply(components::input_styles)
             .style("font-size", "17px")
             .prop_signal("value", wd.date.signal_cloned())
             .with_node!(el => {
@@ -187,13 +158,7 @@ fn render_add_entry_button(wd: Arc<WorkdayState>) -> Dom {
                 None
             } else {
                 Some(html!("button", {
-                    .style("background", "#2563eb")
-                    .style("color", "white")
-                    .style("border", "none")
-                    .style("border-radius", "4px")
-                    .style("padding", "8px 18px")
-                    .style("cursor", "pointer")
-                    .style("font-size", "16px")
+                    .apply(components::action_button_styles)
                     .text("+ Add Entry")
                     .event(clone!(wd => move |_: events::Click| {
                         wd.draft_visible.set(true);
@@ -212,7 +177,7 @@ fn render_draft_form(state: Arc<AppState>, wd: Arc<WorkdayState>, templates: Arc
         .style("border-radius", "6px")
         .style("padding", "20px")
 
-        // Template selector (shown only when templates exist)
+        // Template selector
         .child_signal(templates.signal_vec_cloned().to_signal_cloned().map(clone!(wd => move |list| {
             if list.is_empty() {
                 None
@@ -221,18 +186,12 @@ fn render_draft_form(state: Arc<AppState>, wd: Arc<WorkdayState>, templates: Arc
                 Some(html!("div", {
                     .dwclass!("flex items-center gap-4")
                     .child(html!("label", {
-                        .style("color", "#d1d5db")
-                        .style("font-size", "16px")
+                        .apply(components::label_styles)
                         .style("width", "100px")
                         .text("Template")
                     }))
                     .child(html!("select" => HtmlSelectElement, {
-                        .style("background", "#374151")
-                        .style("color", "white")
-                        .style("border", "1px solid #4b5563")
-                        .style("border-radius", "4px")
-                        .style("padding", "8px 14px")
-                        .style("font-size", "16px")
+                        .apply(components::input_styles)
                         .children({
                             let mut opts = vec![html!("option", {
                                 .attr("value", "")
@@ -271,21 +230,15 @@ fn render_draft_form(state: Arc<AppState>, wd: Arc<WorkdayState>, templates: Arc
         .child(html!("div", {
             .dwclass!("flex items-center gap-4")
             .child(html!("label", {
-                .style("color", "#d1d5db")
-                .style("font-size", "16px")
+                .apply(components::label_styles)
                 .style("width", "65px")
                 .text("Hours")
             }))
             .child(html!("input" => HtmlInputElement, {
                 .attr("type", "text")
                 .attr("inputmode", "decimal")
-                .style("background", "#374151")
-                .style("color", "white")
-                .style("border", "1px solid #4b5563")
-                .style("border-radius", "4px")
-                .style("padding", "8px 14px")
+                .apply(components::input_styles)
                 .style("width", "110px")
-                .style("font-size", "16px")
                 .prop_signal("value", wd.draft.hours.signal_cloned())
                 .with_node!(el => {
                     .event(clone!(wd => move |_: events::Input| {
@@ -299,19 +252,13 @@ fn render_draft_form(state: Arc<AppState>, wd: Arc<WorkdayState>, templates: Arc
         .child(html!("div", {
             .dwclass!("flex flex-col gap-2")
             .children_signal_vec(wd.draft.categories.signal_vec_cloned().map(clone!(wd, state => move |cat| {
-                render_category_row(wd.clone(), state.clone(), cat)
+                components::render_category_row(&wd.draft.categories, &state.category_definitions, cat)
             })))
         }))
 
         // "+ Category" button
         .child(html!("button", {
-            .style("background", "none")
-            .style("color", "#60a5fa")
-            .style("border", "1px solid #60a5fa")
-            .style("border-radius", "4px")
-            .style("padding", "6px 14px")
-            .style("cursor", "pointer")
-            .style("font-size", "15px")
+            .apply(components::secondary_button_styles)
             .style("align-self", "flex-start")
             .text("+ Category")
             .event(clone!(wd => move |_: events::Click| {
@@ -321,11 +268,7 @@ fn render_draft_form(state: Arc<AppState>, wd: Arc<WorkdayState>, templates: Arc
 
         // Validation error
         .child_signal(wd.error_msg.signal_ref(|msg| {
-            msg.as_ref().map(|m| html!("span", {
-                .style("color", "#f87171")
-                .style("font-size", "15px")
-                .text(m)
-            }))
+            components::render_error_message(msg)
         }))
 
         // Add + Cancel buttons
@@ -351,101 +294,11 @@ fn render_draft_form(state: Arc<AppState>, wd: Arc<WorkdayState>, templates: Arc
     })
 }
 
-fn render_category_row(wd: Arc<WorkdayState>, state: Arc<AppState>, cat: Arc<DraftCategory>) -> Dom {
-    let val_list_id = format!("cat-val-{:x}", Arc::as_ptr(&cat) as usize);
-    let value_options = futures_signals::map_ref! {
-        let key = cat.key.signal_cloned(),
-        let defs = state.category_definitions.signal_cloned()
-        => {
-            defs.iter().find(|d| d.name == *key)
-                .map(|d| d.values.clone()).unwrap_or_default()
-        }
-    };
-    html!("div", {
-        .dwclass!("flex items-center gap-2")
-        .child(html!("datalist", {
-            .attr("id", &val_list_id)
-            .children_signal_vec(
-                value_options
-                    .map(|vals| vals.into_iter()
-                        .map(|v| html!("option", { .attr("value", &v) }))
-                        .collect::<Vec<_>>())
-                    .to_signal_vec()
-            )
-        }))
-        .child(html!("input" => HtmlInputElement, {
-            .attr("type", "text")
-            .attr("placeholder", "Category")
-            .attr("list", "cat-keys-datalist")
-            .style("background", "#374151")
-            .style("color", "white")
-            .style("border", "1px solid #4b5563")
-            .style("border-radius", "4px")
-            .style("padding", "8px 14px")
-            .style("width", "160px")
-            .style("font-size", "16px")
-            .prop_signal("value", cat.key.signal_cloned())
-            .with_node!(el => {
-                .event(clone!(cat => move |_: events::Input| {
-                    cat.key.set(el.value());
-                }))
-            })
-        }))
-        .child(html!("input" => HtmlInputElement, {
-            .attr("type", "text")
-            .attr("placeholder", "Value")
-            .attr("list", &val_list_id)
-            .style("background", "#374151")
-            .style("color", "white")
-            .style("border", "1px solid #4b5563")
-            .style("border-radius", "4px")
-            .style("padding", "8px 14px")
-            .style("width", "160px")
-            .style("font-size", "16px")
-            .prop_signal("value", cat.value.signal_cloned())
-            .with_node!(el => {
-                .event(clone!(cat => move |_: events::Input| {
-                    cat.value.set(el.value());
-                }))
-            })
-        }))
-        .child(html!("button", {
-            .style("background", "none")
-            .style("color", "#f87171")
-            .style("border", "none")
-            .style("cursor", "pointer")
-            .style("font-size", "14px")
-            .text("✕")
-            .event(clone!(wd, cat => move |_: events::Click| {
-                let ptr = Arc::as_ptr(&cat);
-                wd.draft.categories.lock_mut().retain(|c| Arc::as_ptr(c) != ptr);
-            }))
-        }))
-    })
-}
-
-fn render_category_keys_datalist(state: Arc<AppState>) -> Dom {
-    html!("datalist", {
-        .attr("id", "cat-keys-datalist")
-        .children_signal_vec(
-            state.category_definitions.signal_cloned()
-                .map(|defs| defs.into_iter()
-                    .map(|d| html!("option", { .attr("value", &d.name) }))
-                    .collect::<Vec<_>>())
-                .to_signal_vec()
-        )
-    })
-}
-
 fn render_commit_button(wd: Arc<WorkdayState>) -> Dom {
     html!("button", {
-        .style("background", "#16a34a")
-        .style("color", "white")
-        .style("border", "none")
-        .style("border-radius", "4px")
+        .apply(components::primary_button_styles)
         .style("padding", "8px 18px")
         .style("cursor", "pointer")
-        .style("font-size", "16px")
         .text("Add")
         .event(clone!(wd => move |_: events::Click| {
             let hours_str = wd.draft.hours.lock_ref().clone();
@@ -481,11 +334,7 @@ fn render_action_bar(state: Arc<AppState>) -> Dom {
         .style("border-top", "1px solid #374151")
 
         .child_signal(wd.status_msg.signal_ref(|msg| {
-            msg.as_ref().map(|m| html!("span", {
-                .style("color", "#6ee7b7")
-                .style("font-size", "16px")
-                .text(m)
-            }))
+            components::render_status_message(msg)
         }))
 
         .child(html!("div", {
@@ -650,10 +499,25 @@ async fn do_export(state: Arc<AppState>) {
         Ok(_) => {
             wd.status_msg.set(Some("Exported!".to_string()));
             if wd.include_monthly.get() {
-                let monthly_args = MonthlyArgs { folder, format, date, date_format, entries, padding_columns };
-                if let Ok(args) = tauri_wasm::args(&monthly_args) {
-                    let _ = tauri_wasm::invoke("export_monthly").with_args(args).await;
+                let monthly_args = ExportArgs { folder, format, date, date_format, entries, padding_columns };
+                let result = {
+                    let args = match tauri_wasm::args(&monthly_args) {
+                        Ok(a) => a,
+                        Err(e) => {
+                            wd.status_msg.set(Some(format!("Exported, but monthly args error: {:?}", e)));
+                            return;
+                        }
+                    };
+                    tauri_wasm::invoke("export_monthly").with_args(args).await
                 };
+                match result {
+                    Ok(_) => {
+                        wd.status_msg.set(Some("Exported (+ monthly)!".to_string()));
+                    }
+                    Err(e) => {
+                        wd.status_msg.set(Some(format!("Exported, but monthly failed: {:?}", e)));
+                    }
+                }
             }
         }
         Err(e) => wd.status_msg.set(Some(format!("Export failed: {:?}", e))),

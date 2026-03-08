@@ -4,6 +4,11 @@ use dominator::{clone, html, Dom};
 use futures_signals::signal::Mutable;
 use futures_signals::signal_vec::MutableVec;
 
+pub use get_clocked_shared::{
+    CategoryDefinition, DateFormat, ExportArgs, ExportFormat, Settings, Template as TemplateData,
+    WorkEntry,
+};
+
 use crate::pages;
 
 #[derive(Clone, PartialEq)]
@@ -13,68 +18,6 @@ pub enum AppPage {
     RegisterWorkday,
     TemplateMaker,
     CategoryManager,
-}
-
-#[derive(Clone, PartialEq)]
-pub enum ExportFormat {
-    Csv,
-    Xlsx,
-}
-
-impl ExportFormat {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            ExportFormat::Csv => "csv",
-            ExportFormat::Xlsx => "xlsx",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "xlsx" => ExportFormat::Xlsx,
-            _ => ExportFormat::Csv,
-        }
-    }
-}
-
-#[derive(Clone, PartialEq)]
-pub enum DateFormat {
-    YyyyMmDd,
-    YyyyDotMmDotDd,
-    DdMmYyyy,
-    DdDotMmDotYyyy,
-}
-
-impl DateFormat {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            DateFormat::YyyyMmDd => "YYYY-MM-DD",
-            DateFormat::YyyyDotMmDotDd => "YYYY.MM.DD",
-            DateFormat::DdMmYyyy => "DD-MM-YYYY",
-            DateFormat::DdDotMmDotYyyy => "DD.MM.YYYY",
-        }
-    }
-
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "YYYY.MM.DD" => DateFormat::YyyyDotMmDotDd,
-            "DD-MM-YYYY" => DateFormat::DdMmYyyy,
-            "DD.MM.YYYY" => DateFormat::DdDotMmDotYyyy,
-            _ => DateFormat::YyyyMmDd,
-        }
-    }
-
-    pub fn format_date(&self, iso_date: &str) -> String {
-        let parts: Vec<&str> = iso_date.split('-').collect();
-        if parts.len() != 3 { return iso_date.to_string(); }
-        let (y, m, d) = (parts[0], parts[1], parts[2]);
-        match self {
-            DateFormat::DdDotMmDotYyyy => format!("{}.{}.{}", d, m, y),
-            DateFormat::DdMmYyyy       => format!("{}-{}-{}", d, m, y),
-            DateFormat::YyyyDotMmDotDd => format!("{}.{}.{}", y, m, d),
-            DateFormat::YyyyMmDd       => format!("{}-{}-{}", y, m, d),
-        }
-    }
 }
 
 pub struct DraftCategory {
@@ -108,24 +51,6 @@ impl DraftEntry {
         self.hours.set(String::new());
         self.categories.lock_mut().clear();
     }
-}
-
-#[derive(Clone, serde::Serialize)]
-pub struct WorkEntry {
-    pub hours: f64,
-    pub categories: Vec<(String, String)>,
-}
-
-#[derive(Clone, serde::Deserialize)]
-pub struct TemplateData {
-    pub name: String,
-    pub categories: Vec<(String, String)>,
-}
-
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct CategoryDefinition {
-    pub name: String,
-    pub values: Vec<String>,
 }
 
 pub struct DraftCategoryDefinition {
@@ -240,7 +165,22 @@ impl WorkdayState {
 
 fn today_date_string() -> String {
     let d = js_sys::Date::new_0();
-    format!("{:04}-{:02}-{:02}", d.get_full_year(), d.get_month() + 1, d.get_date())
+    format!(
+        "{:04}-{:02}-{:02}",
+        d.get_full_year(),
+        d.get_month() + 1,
+        d.get_date()
+    )
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SaveArgs {
+    export_folder: String,
+    export_format: String,
+    template_folder: String,
+    date_format: String,
+    padding_columns: u32,
 }
 
 pub struct AppState {
@@ -256,30 +196,6 @@ pub struct AppState {
     pub category_manager: Arc<CategoryManagerState>,
 }
 
-fn default_date_format_str() -> String { "YYYY-MM-DD".to_string() }
-
-#[derive(serde::Serialize, serde::Deserialize, Default)]
-struct Settings {
-    export_folder: String,
-    export_format: String,
-    #[serde(default)]
-    template_folder: String,
-    #[serde(default = "default_date_format_str")]
-    date_format: String,
-    #[serde(default)]
-    padding_columns: u32,
-}
-
-#[derive(serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SaveArgs {
-    export_folder: String,
-    export_format: String,
-    template_folder: String,
-    date_format: String,
-    padding_columns: String,
-}
-
 impl AppState {
     pub async fn load() -> Self {
         let settings: Settings = async {
@@ -292,8 +208,11 @@ impl AppState {
         .unwrap_or_default();
 
         let categories: Vec<CategoryDefinition> = async {
-            let js_val = tauri_wasm::invoke("get_categories").await.map_err(|e| e.to_string())?;
-            serde_wasm_bindgen::from_value::<Vec<CategoryDefinition>>(js_val).map_err(|e| e.to_string())
+            let js_val = tauri_wasm::invoke("get_categories")
+                .await
+                .map_err(|e| e.to_string())?;
+            serde_wasm_bindgen::from_value::<Vec<CategoryDefinition>>(js_val)
+                .map_err(|e| e.to_string())
         }
         .await
         .unwrap_or_default();
@@ -301,9 +220,11 @@ impl AppState {
         AppState {
             page: Mutable::new(AppPage::Home),
             export_folder: Mutable::new(settings.export_folder),
-            export_format: Mutable::new(ExportFormat::from_str(&settings.export_format)),
+            export_format: Mutable::new(
+                settings.export_format.parse().unwrap_or_default(),
+            ),
             template_folder: Mutable::new(settings.template_folder),
-            date_format: Mutable::new(DateFormat::from_str(&settings.date_format)),
+            date_format: Mutable::new(settings.date_format.parse().unwrap_or_default()),
             padding_columns: Mutable::new(settings.padding_columns),
             workday: Arc::new(WorkdayState::new()),
             template_maker: TemplateMakerState::new(),
@@ -318,7 +239,7 @@ impl AppState {
             export_format: state.export_format.lock_ref().as_str().to_string(),
             template_folder: state.template_folder.lock_ref().clone(),
             date_format: state.date_format.lock_ref().as_str().to_string(),
-            padding_columns: state.padding_columns.get().to_string(),
+            padding_columns: state.padding_columns.get(),
         };
         let args = tauri_wasm::args(&raw_args).map_err(|e| e.to_string())?;
         tauri_wasm::invoke("save_settings")
