@@ -1188,13 +1188,14 @@ dependencies = [
 
 [[package]]
 name = "get-clocked"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "console_error_panic_hook",
  "dominator",
  "dwind",
  "dwind-macros",
  "futures-signals",
+ "get-clocked-shared",
  "js-sys",
  "serde",
  "serde-wasm-bindgen",
@@ -1205,11 +1206,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "get-clocked-shared"
+version = "0.3.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "get-clocked-tauri"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "calamine",
  "csv",
+ "get-clocked-shared",
+ "indexmap 2.13.0",
  "rust_xlsxwriter",
  "serde",
  "serde_json",

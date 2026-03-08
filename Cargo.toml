@@ -1,2 +1,2 @@
 [workspace]
-members = ["frontend", "src-tauri"]
+members = ["frontend", "src-tauri", "shared"]
